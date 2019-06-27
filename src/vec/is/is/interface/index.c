@@ -1192,13 +1192,27 @@ PetscErrorCode  ISCopy(IS is,IS isy)
   PetscFunctionReturn(0);
 }
 
+static PetscErrorCode ISCreateEmptyFromISTypeEnum_Private(ISTypeEnum type, PetscCopyMode mode, IS *newis)
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  switch (type) {
+    case IS_GENERAL: ierr = ISCreateGeneral(PETSC_COMM_SELF,0,NULL,mode,newis);CHKERRQ(ierr); break;
+    case IS_STRIDE:  ierr = ISCreateStride(PETSC_COMM_SELF,0,0,0,newis);CHKERRQ(ierr); break;
+    case IS_BLOCK:   ierr = ISCreateBlock(PETSC_COMM_SELF,1,0,NULL,mode,newis);CHKERRQ(ierr); break;
+    default: SETERRQ(PETSC_COMM_SELF,PETSC_ERR_PLIB,"Unknown ISTypeEnum");
+  }
+  PetscFunctionReturn(0);
+}
+
 /*@
    ISOnComm - Split a parallel IS on subcomms (usually self) or concatenate index sets on subcomms into a parallel index set
 
    Collective on IS
 
    Input Arguments:
-+ is - index set
++ is - index set or NULL
 . comm - communicator for new index set
 - mode - copy semantics, PETSC_USE_POINTER for no-copy if possible, otherwise PETSC_COPY_VALUES
 
@@ -1213,25 +1227,40 @@ PetscErrorCode  ISCopy(IS is,IS isy)
    This function is useful if serial ISs must be created independently, or to view many
    logically independent serial ISs.
 
-   The input IS must have the same type on every process.
+   A non-NULL input IS must have the same type on every process.
+   Passing NULL as input IS has the same effect as passing an empty IS of the proper type on that process.
+   Input IS cannot be NULL on all processes.
 
 .seealso: ISSplit()
 @*/
 PetscErrorCode  ISOnComm(IS is,MPI_Comm comm,PetscCopyMode mode,IS *newis)
 {
+  PetscMPIInt    match=MPI_UNEQUAL;
+  ISTypeEnum     type0=IS_UNDEF,type;
   PetscErrorCode ierr;
-  PetscMPIInt    match;
 
   PetscFunctionBegin;
-  PetscValidHeaderSpecific(is,IS_CLASSID,1);
+  if (is) {
+    PetscValidHeaderSpecific(is,IS_CLASSID,1);
+    PetscValidType(is,1);
+  }
   PetscValidPointer(newis,3);
-  ierr = MPI_Comm_compare(PetscObjectComm((PetscObject)is),comm,&match);CHKERRQ(ierr);
   if (mode == PETSC_OWN_POINTER) SETERRQ(comm,PETSC_ERR_ARG_WRONG,"Cannot use PETSC_OWN_POINTER");
+  if (is) {
+    type0 = is->is_type;
+    if (!type0) SETERRQ(comm,PETSC_ERR_PLIB,"ISTypeEnum not set for this IS");
+  }
+  ierr = MPIU_Allreduce(&type0,&type,1,MPI_INT,MPI_MAX,comm);CHKERRQ(ierr);
+  if (is && type != type0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_NOTSAMETYPE,"ISType must be same on all processes");
+  if (!type) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_NOTSAMETYPE,"IS cannot be NULL on all processes");
+  if (is) {ierr = MPI_Comm_compare(PetscObjectComm((PetscObject)is),comm,&match);CHKERRQ(ierr);}
   if (mode != PETSC_COPY_VALUES && (match == MPI_IDENT || match == MPI_CONGRUENT)) {
     ierr   = PetscObjectReference((PetscObject)is);CHKERRQ(ierr);
     *newis = is;
   } else {
+    if (!is) {ierr = ISCreateEmptyFromISTypeEnum_Private(type,mode,&is);CHKERRQ(ierr);}
     ierr = (*is->ops->oncomm)(is,comm,mode,newis);CHKERRQ(ierr);
+    if (!type0) {ierr = ISDestroy(&is);CHKERRQ(ierr);}
   }
   PetscFunctionReturn(0);
 }
