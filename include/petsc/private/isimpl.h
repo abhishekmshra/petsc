@@ -36,6 +36,8 @@ struct _ISOps {
   PetscErrorCode (*locate)(IS,PetscInt,PetscInt *);
 };
 
+typedef enum {IS_UNDEF=0,IS_GENERAL,IS_STRIDE,IS_BLOCK} ISTypeEnum;
+
 struct _p_IS {
   PETSCHEADER(struct _ISOps);
   PetscLayout  map;
@@ -45,6 +47,7 @@ struct _p_IS {
   PetscBool    isidentity;
   PetscInt     *total, *nonlocal;   /* local representation of ALL indices across the comm as well as the nonlocal part. */
   PetscInt     local_offset;        /* offset to the local part within the total index set */
+  ISTypeEnum   is_type;             /* integer representation of ISType useful for MPI operations */
   IS           complement;          /* IS wrapping nonlocal indices. */
 };
 
