@@ -1,0 +1,46 @@
+IS Object: 4 MPI processes
+  type: block
+Block size 4
+Number of block indices in set 8
+The first indices of each block are
+Block 0 Index 5
+Block 1 Index 3
+Block 2 Index 1
+Block 3 Index -1
+Block 4 Index -3
+Block 5 Index -5
+Block 6 Index -7
+Block 7 Index -9
+Block size 4
+Number of block indices in set 8
+The first indices of each block are
+Block 0 Index 105
+Block 1 Index 103
+Block 2 Index 101
+Block 3 Index 99
+Block 4 Index 97
+Block 5 Index 95
+Block 6 Index 93
+Block 7 Index 91
+Block size 4
+Number of block indices in set 8
+The first indices of each block are
+Block 0 Index 205
+Block 1 Index 203
+Block 2 Index 201
+Block 3 Index 199
+Block 4 Index 197
+Block 5 Index 195
+Block 6 Index 193
+Block 7 Index 191
+Block size 4
+Number of block indices in set 8
+The first indices of each block are
+Block 0 Index 305
+Block 1 Index 303
+Block 2 Index 301
+Block 3 Index 299
+Block 4 Index 297
+Block 5 Index 295
+Block 6 Index 293
+Block 7 Index 291
