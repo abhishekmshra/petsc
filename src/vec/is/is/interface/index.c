@@ -1226,6 +1226,7 @@ PetscErrorCode  ISOnComm(IS is,MPI_Comm comm,PetscCopyMode mode,IS *newis)
   PetscValidHeaderSpecific(is,IS_CLASSID,1);
   PetscValidPointer(newis,3);
   ierr = MPI_Comm_compare(PetscObjectComm((PetscObject)is),comm,&match);CHKERRQ(ierr);
+  if (mode == PETSC_OWN_POINTER) SETERRQ(comm,PETSC_ERR_ARG_WRONG,"Cannot use PETSC_OWN_POINTER");
   if (mode != PETSC_COPY_VALUES && (match == MPI_IDENT || match == MPI_CONGRUENT)) {
     ierr   = PetscObjectReference((PetscObject)is);CHKERRQ(ierr);
     *newis = is;
