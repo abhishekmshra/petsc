@@ -1209,7 +1209,7 @@ static PetscErrorCode ISCreateEmptyFromISTypeEnum_Private(ISTypeEnum type, Petsc
 /*@
    ISOnComm - Split a parallel IS on subcomms (usually self) or concatenate index sets on subcomms into a parallel index set
 
-   Collective on IS
+   Collective on comm
 
    Input Arguments:
 + is - index set or NULL
