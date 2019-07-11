@@ -712,7 +712,6 @@ PETSC_EXTERN PetscErrorCode ISCreate_General(IS is)
   PetscFunctionBegin;
   ierr = PetscNewLog(is,&sub);CHKERRQ(ierr);
   is->data = (void *) sub;
-  is->is_type = IS_GENERAL;
   ierr = PetscMemcpy(is->ops,&myops,sizeof(myops));CHKERRQ(ierr);
   ierr = PetscObjectComposeFunction((PetscObject)is,"ISGeneralSetIndices_C",ISGeneralSetIndices_General);CHKERRQ(ierr);
   PetscFunctionReturn(0);

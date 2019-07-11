@@ -634,7 +634,6 @@ PETSC_EXTERN PetscErrorCode ISCreate_Block(IS is)
   PetscFunctionBegin;
   ierr = PetscNewLog(is,&sub);CHKERRQ(ierr);
   is->data = (void *) sub;
-  is->is_type = IS_BLOCK;
   ierr = PetscMemcpy(is->ops,&myops,sizeof(myops));CHKERRQ(ierr);
   ierr = PetscObjectComposeFunction((PetscObject)is,"ISBlockSetIndices_C",ISBlockSetIndices_Block);CHKERRQ(ierr);
   ierr = PetscObjectComposeFunction((PetscObject)is,"ISBlockGetIndices_C",ISBlockGetIndices_Block);CHKERRQ(ierr);

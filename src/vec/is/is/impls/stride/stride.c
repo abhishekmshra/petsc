@@ -420,7 +420,6 @@ PETSC_EXTERN PetscErrorCode ISCreate_Stride(IS is)
   PetscFunctionBegin;
   ierr = PetscNewLog(is,&sub);CHKERRQ(ierr);
   is->data = (void *) sub;
-  is->is_type = IS_STRIDE;
   ierr = PetscMemcpy(is->ops,&myops,sizeof(myops));CHKERRQ(ierr);
   ierr = PetscObjectComposeFunction((PetscObject)is,"ISStrideSetStride_C",ISStrideSetStride_Stride);CHKERRQ(ierr);
   PetscFunctionReturn(0);
