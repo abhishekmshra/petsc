@@ -1192,16 +1192,31 @@ PetscErrorCode  ISCopy(IS is,IS isy)
   PetscFunctionReturn(0);
 }
 
-static PetscErrorCode ISCreateEmptyFromISTypeEnum_Private(ISTypeEnum type, PetscCopyMode mode, IS *newis)
+static PetscErrorCode ISTypeToInt_Private(const char type[], PetscInt *typeNumber)
+{
+  const char     *types[3];
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  types[0] = ISGENERAL;
+  types[1] = ISSTRIDE;
+  types[2] = ISBLOCK;
+  *typeNumber = -1;
+  ierr = PetscEListFind(3,types,type,typeNumber,NULL);CHKERRQ(ierr);
+  if (*typeNumber < 0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_PLIB,"Unknown ISType");
+  PetscFunctionReturn(0);
+}
+
+static PetscErrorCode ISCreateEmptyFromISTypeNum_Private(PetscInt typeNumber, PetscCopyMode mode, IS *newis)
 {
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  switch (type) {
-    case IS_GENERAL: ierr = ISCreateGeneral(PETSC_COMM_SELF,0,NULL,mode,newis);CHKERRQ(ierr); break;
-    case IS_STRIDE:  ierr = ISCreateStride(PETSC_COMM_SELF,0,0,0,newis);CHKERRQ(ierr); break;
-    case IS_BLOCK:   ierr = ISCreateBlock(PETSC_COMM_SELF,1,0,NULL,mode,newis);CHKERRQ(ierr); break;
-    default: SETERRQ(PETSC_COMM_SELF,PETSC_ERR_PLIB,"Unknown ISTypeEnum");
+  switch (typeNumber) {
+    case 0: ierr = ISCreateGeneral(PETSC_COMM_SELF,0,NULL,mode,newis);CHKERRQ(ierr); break;
+    case 1: ierr = ISCreateStride(PETSC_COMM_SELF,0,0,0,newis);CHKERRQ(ierr); break;
+    case 2: ierr = ISCreateBlock(PETSC_COMM_SELF,1,0,NULL,mode,newis);CHKERRQ(ierr); break;
+    default: SETERRQ(PETSC_COMM_SELF,PETSC_ERR_PLIB,"Unknown ISType");
   }
   PetscFunctionReturn(0);
 }
@@ -1236,7 +1251,7 @@ static PetscErrorCode ISCreateEmptyFromISTypeEnum_Private(ISTypeEnum type, Petsc
 PetscErrorCode  ISOnComm(IS is,MPI_Comm comm,PetscCopyMode mode,IS *newis)
 {
   PetscMPIInt    match=MPI_UNEQUAL;
-  ISTypeEnum     type0=IS_UNDEF,type;
+  PetscInt       type0=-1,type;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -1247,20 +1262,19 @@ PetscErrorCode  ISOnComm(IS is,MPI_Comm comm,PetscCopyMode mode,IS *newis)
   PetscValidPointer(newis,3);
   if (mode == PETSC_OWN_POINTER) SETERRQ(comm,PETSC_ERR_ARG_WRONG,"Cannot use PETSC_OWN_POINTER");
   if (is) {
-    type0 = is->is_type;
-    if (!type0) SETERRQ(comm,PETSC_ERR_PLIB,"ISTypeEnum not set for this IS");
+    ierr = ISTypeToInt_Private(((PetscObject)is)->type_name,&type0);CHKERRQ(ierr);
   }
-  ierr = MPIU_Allreduce(&type0,&type,1,MPI_INT,MPI_MAX,comm);CHKERRQ(ierr);
+  ierr = MPIU_Allreduce(&type0,&type,1,MPIU_INT,MPI_MAX,comm);CHKERRQ(ierr);
   if (is && type != type0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_NOTSAMETYPE,"ISType must be same on all processes");
-  if (!type) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_NOTSAMETYPE,"IS cannot be NULL on all processes");
+  if (type < 0) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_ARG_NOTSAMETYPE,"IS cannot be NULL on all processes");
   if (is) {ierr = MPI_Comm_compare(PetscObjectComm((PetscObject)is),comm,&match);CHKERRQ(ierr);}
   if (mode != PETSC_COPY_VALUES && (match == MPI_IDENT || match == MPI_CONGRUENT)) {
     ierr   = PetscObjectReference((PetscObject)is);CHKERRQ(ierr);
     *newis = is;
   } else {
-    if (!is) {ierr = ISCreateEmptyFromISTypeEnum_Private(type,mode,&is);CHKERRQ(ierr);}
+    if (!is) {ierr = ISCreateEmptyFromISTypeNum_Private(type,mode,&is);CHKERRQ(ierr);}
     ierr = (*is->ops->oncomm)(is,comm,mode,newis);CHKERRQ(ierr);
-    if (!type0) {ierr = ISDestroy(&is);CHKERRQ(ierr);}
+    if (type0 < 0) {ierr = ISDestroy(&is);CHKERRQ(ierr);}
   }
   PetscFunctionReturn(0);
 }
