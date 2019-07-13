@@ -36,7 +36,6 @@ native PCMGType
 native PCMGCycleType
 native PCMGGalerkinType
 native PCExoticType
-native PCDeflationType
 native PetscSFWindowSyncType
 native SNESCompositeType
 native SNESFASType
