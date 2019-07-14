@@ -3,7 +3,7 @@ import os
 
 class Configure(config.package.GNUPackage):
   def __init__(self, framework):
-    config.package.Package.__init__(self, framework)
+    config.package.GNUPackage.__init__(self, framework)
     self.version          = '1.11.2'
     self.versionname      = 'PNETCDF_VERSION'
     self.download         = ['http://cucis.ece.northwestern.edu/projects/PnetCDF/Release/pnetcdf-'+self.version+'.tar.gz',
@@ -11,6 +11,7 @@ class Configure(config.package.GNUPackage):
     self.functions        = ['ncmpi_create']
     self.includes         = ['pnetcdf.h']
     self.liblist          = [['libpnetcdf.a']]
+    self.useddirectly     = 0
     return
 
   def setupDependencies(self, framework):
