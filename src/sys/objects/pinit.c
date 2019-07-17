@@ -835,6 +835,7 @@ PetscErrorCode  PetscInitialize(int *argc,char ***args,const char file[],const c
   }
 #endif
 
+
   /* these must be initialized in a routine, not as a constant declaration*/
   PETSC_STDOUT = stdout;
   PETSC_STDERR = stderr;
@@ -859,12 +860,6 @@ PetscErrorCode  PetscInitialize(int *argc,char ***args,const char file[],const c
   ierr = MPI_Initialized(&flag);CHKERRQ(ierr);
   if (!flag) {
     if (PETSC_COMM_WORLD != MPI_COMM_NULL) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_SUP,"You cannot set PETSC_COMM_WORLD if you have not initialized MPI first");
-
-#if defined(PETSC_HAVE_HWLOC_SOLARIS_BUG)
-    /* see MPI.py for details on this bug */
-    (void) setenv("HWLOC_COMPONENTS","-x86",1);
-#endif
-
 #if defined(PETSC_HAVE_MPI_INIT_THREAD)
     {
       PetscMPIInt provided;
@@ -875,7 +870,6 @@ PetscErrorCode  PetscInitialize(int *argc,char ***args,const char file[],const c
 #endif
     PetscBeganMPI = PETSC_TRUE;
   }
-
   if (argc && args) {
     PetscGlobalArgc = *argc;
     PetscGlobalArgs = *args;
