@@ -165,7 +165,8 @@ PetscErrorCode PCDeflationGetSpaceWave(PC pc,Mat *W,PetscInt size,PetscInt ncoef
 PetscErrorCode PCDeflationGetSpaceAggregation(PC pc,Mat *W)
 {
   Mat            A,defl;
-  PetscInt       i,ilo,ihi,*Iidx,m,M;
+  PetscInt       i,ilo,ihi,*Iidx,M;
+  PetscMPIInt    m;
   PetscScalar    *col;
   MPI_Comm       comm;
   PetscErrorCode ierr;
@@ -189,7 +190,8 @@ PetscErrorCode PCDeflationGetSpaceAggregation(PC pc,Mat *W)
     Iidx[i-ilo] = i;
     col[i-ilo] = 1;
   }
-  ierr = MPI_Comm_rank(comm,&i);CHKERRQ(ierr);
+  ierr = MPI_Comm_rank(comm,&m);CHKERRQ(ierr);
+  i = m;
   ierr = MatSetValues(defl,ihi-ilo,Iidx,1,&i,col,INSERT_VALUES);CHKERRQ(ierr);
 
   ierr = MatAssemblyBegin(defl,MAT_FINAL_ASSEMBLY);CHKERRQ(ierr);
@@ -215,17 +217,17 @@ PetscErrorCode PCDeflationComputeSpace(PC pc)
       transp = PETSC_FALSE;
       ierr = PCDeflationGetSpaceHaar(pc,&defl,def->spacesize);CHKERRQ(ierr);break;
     case PC_DEFLATION_SPACE_DB2:
-      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,2,db2,!def->extendsp);CHKERRQ(ierr);break;
+      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,2,db2,PetscNot(def->extendsp));CHKERRQ(ierr);break;
     case PC_DEFLATION_SPACE_DB4:
-      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,4,db4,!def->extendsp);CHKERRQ(ierr);break;
+      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,4,db4,PetscNot(def->extendsp));CHKERRQ(ierr);break;
     case PC_DEFLATION_SPACE_DB8:
-      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,8,db8,!def->extendsp);CHKERRQ(ierr);break;
+      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,8,db8,PetscNot(def->extendsp));CHKERRQ(ierr);break;
     case PC_DEFLATION_SPACE_DB16:
-      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,16,db16,!def->extendsp);CHKERRQ(ierr);break;
+      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,16,db16,PetscNot(def->extendsp));CHKERRQ(ierr);break;
     case PC_DEFLATION_SPACE_BIORTH22:
-      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,6,biorth22,!def->extendsp);CHKERRQ(ierr);break;
+      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,6,biorth22,PetscNot(def->extendsp));CHKERRQ(ierr);break;
     case PC_DEFLATION_SPACE_MEYER:
-      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,62,meyer,!def->extendsp);CHKERRQ(ierr);break;
+      ierr = PCDeflationGetSpaceWave(pc,&defl,def->spacesize,62,meyer,PetscNot(def->extendsp));CHKERRQ(ierr);break;
     case PC_DEFLATION_SPACE_AGGREGATION:
       transp = PETSC_FALSE;
       ierr = PCDeflationGetSpaceAggregation(pc,&defl);CHKERRQ(ierr);break;

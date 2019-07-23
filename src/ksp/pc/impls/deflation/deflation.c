@@ -227,13 +227,15 @@ static PetscErrorCode PCDeflationSetSpace_Deflation(PC pc,Mat W,PetscBool transp
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
+  /* possibly allows W' = Wt (which is valid but not tested) */
+  ierr = PetscObjectReference((PetscObject)W);CHKERRQ(ierr);
   if (transpose) {
+    ierr = MatDestroy(&def->Wt);CHKERRQ(ierr);
     def->Wt = W;
-    def->W = NULL;
   } else {
+    ierr = MatDestroy(&def->W);CHKERRQ(ierr);
     def->W = W;
   }
-  ierr = PetscObjectReference((PetscObject)W);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -278,9 +280,9 @@ static PetscErrorCode PCDeflationSetProjectionNullSpaceMat_Deflation(PC pc,Mat m
   PetscErrorCode   ierr;
 
   PetscFunctionBegin;
+  ierr = PetscObjectReference((PetscObject)mat);CHKERRQ(ierr);
   ierr = MatDestroy(&def->WtA);CHKERRQ(ierr);
   def->WtA = mat;
-  ierr = PetscObjectReference((PetscObject)mat);CHKERRQ(ierr);
   ierr = PetscLogObjectParent((PetscObject)pc,(PetscObject)def->WtA);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
@@ -497,7 +499,8 @@ static PetscErrorCode PCSetUp_Deflation(PC pc)
   KSP              innerksp;
   PC               pcinner;
   Mat              Amat,nextDef=NULL,*mats;
-  PetscInt         i,m,red,size,commsize;
+  PetscInt         i,m,red,size;
+  PetscMPIInt      commsize;
   PetscBool        match,flgspd,transp=PETSC_FALSE;
   MatCompositeType ctype;
   MPI_Comm         comm;
@@ -512,7 +515,7 @@ static PetscErrorCode PCSetUp_Deflation(PC pc)
     ierr = PCGetOptionsPrefix(pc,&def->prefix);CHKERRQ(ierr);
   }
   if (def->lvl) {
-    (void) sprintf(prefix,"%d_",(int)def->lvl);
+    ierr = PetscSNPrintf(prefix,sizeof(prefix),"%d_",(int)def->lvl);CHKERRQ(ierr);
   }
 
   /* compute a deflation space */
@@ -615,15 +618,17 @@ static PetscErrorCode PCSetUp_Deflation(PC pc)
       ierr = MatSetOption(def->WtAW,MAT_SPD,flgspd);CHKERRQ(ierr);
 #if defined(PETSC_USE_DEBUG)
       /* Check columns of W are not in kernel of A */
-      PetscReal *norms;
-      ierr = PetscMalloc1(m,&norms);CHKERRQ(ierr);
-      ierr = MatGetColumnNorms(def->WtAW,NORM_INFINITY,norms);CHKERRQ(ierr);
-      for (i=0; i<m; i++) {
-        if (norms[i] < 100*PETSC_MACHINE_EPSILON) {
-          SETERRQ1(comm,PETSC_ERR_SUP,"Column %D of W is in kernel of A.",i);
+      {
+        PetscReal *norms;
+        ierr = PetscMalloc1(m,&norms);CHKERRQ(ierr);
+        ierr = MatGetColumnNorms(def->WtAW,NORM_INFINITY,norms);CHKERRQ(ierr);
+        for (i=0; i<m; i++) {
+          if (norms[i] < 100*PETSC_MACHINE_EPSILON) {
+            SETERRQ1(comm,PETSC_ERR_SUP,"Column %D of W is in kernel of A.",i);
+          }
         }
+        ierr = PetscFree(norms);CHKERRQ(ierr);
       }
-      ierr = PetscFree(norms);CHKERRQ(ierr);
 #endif
     } else {
       ierr = MatGetOption(def->WtAW,MAT_SPD,&flgspd);CHKERRQ(ierr);
@@ -663,6 +668,8 @@ static PetscErrorCode PCSetUp_Deflation(PC pc)
       }
       ierr = KSPAppendOptionsPrefix(def->WtAWinv,"deflation_tel_");CHKERRQ(ierr);
       ierr = PCSetFromOptions(pcinner);CHKERRQ(ierr);
+      ierr = PetscObjectTypeCompare((PetscObject)pcinner,PCTELESCOPE,&match);CHKERRQ(ierr);
+      if (!match) SETERRQ(comm,PETSC_ERR_SUP,"User can not owerwrite PCTELESCOPE on bottom level, use reduction factor = 1 instead.");
       /* Reduction factor choice */
       red = def->reductionfact;
       if (red < 0) {
@@ -908,6 +915,8 @@ PETSC_EXTERN PetscErrorCode PCCreate_Deflation(PC pc)
   def->extendsp      = PETSC_FALSE;
   def->lvl           = 0;
   def->maxlvl        = 0;
+  def->W             = NULL;
+  def->Wt            = NULL;
 
   pc->ops->apply          = PCApply_Deflation;
   pc->ops->presolve       = PCPreSolve_Deflation;
