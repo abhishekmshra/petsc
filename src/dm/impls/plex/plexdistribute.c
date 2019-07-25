@@ -1929,3 +1929,36 @@ PetscErrorCode DMPlexGetRedundantDM(DM dm, PetscSF *sf, DM *redundantMesh)
   ierr = DMDestroy(&gatherDM);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
+
+/*@
+  DMPlexIsDistributed - Find out whether this DM is distributed, i.e. more than one rank owns some points.
+
+  Input Parameter:
+. dm      - The DM object
+
+  Output Parameter:
+. distributed - Flag whether the DM is distributed
+
+  Level: intermediate
+
+.seealso: DMPlexDistribute()
+@*/
+PetscErrorCode DMPlexIsDistributed(DM dm, PetscBool *distributed)
+{
+  PetscInt          pStart, pEnd, my, received;
+  PetscBool         flg;
+  MPI_Comm          comm;
+  PetscErrorCode    ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(dm, DM_CLASSID, 1);
+  PetscValidPointer(distributed,2);
+  ierr = PetscObjectGetComm((PetscObject)dm,&comm);CHKERRQ(ierr);
+  ierr = DMPlexGetChart(dm, &pStart, &pEnd);CHKERRQ(ierr);
+  my = pEnd - pStart;
+  ierr = MPI_Scan(&my, &received, 1, MPIU_INT, MPI_SUM, comm);CHKERRQ(ierr);
+  flg = (my && (received-my)) ? PETSC_TRUE : PETSC_FALSE;
+  ierr = MPI_Allreduce(MPI_IN_PLACE, &flg, 1, MPIU_BOOL, MPI_LOR, comm);CHKERRQ(ierr);
+  *distributed = flg;
+  PetscFunctionReturn(0);
+}
