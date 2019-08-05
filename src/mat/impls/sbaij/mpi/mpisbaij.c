@@ -2192,7 +2192,7 @@ PetscErrorCode  MatMPISBAIJSetPreallocation_MPISBAIJ(Mat B,PetscInt bs,PetscInt 
 
 PetscErrorCode MatMPISBAIJSetPreallocationCSR_MPISBAIJ(Mat B,PetscInt bs,const PetscInt ii[],const PetscInt jj[],const PetscScalar V[])
 {
-  PetscInt       m,rstart,cstart,cend;
+  PetscInt       m,rstart,cend;
   PetscInt       i,j,d,nz,bd, nz_max=0,*d_nnz=0,*o_nnz=0;
   const PetscInt *JJ    =0;
   PetscScalar    *values=0;
@@ -2207,7 +2207,6 @@ PetscErrorCode MatMPISBAIJSetPreallocationCSR_MPISBAIJ(Mat B,PetscInt bs,const P
   ierr   = PetscLayoutGetBlockSize(B->rmap,&bs);CHKERRQ(ierr);
   m      = B->rmap->n/bs;
   rstart = B->rmap->rstart/bs;
-  cstart = B->cmap->rstart/bs;
   cend   = B->cmap->rend/bs;
 
   if (ii[0]) SETERRQ1(PETSC_COMM_SELF,PETSC_ERR_ARG_OUTOFRANGE,"ii[0] must be 0 but it is %D",ii[0]);
@@ -3308,7 +3307,7 @@ PetscErrorCode  MatCreateMPISBAIJWithArrays(MPI_Comm comm,PetscInt bs,PetscInt m
    Though this routine has Preallocation() in the name it also sets the exact nonzero locations of the matrix entries
    and usually the numerical values as well
 
-   Any entries below the diagaonl in are ignored
+   Any entries below the diagonal are ignored
 
 .seealso: MatCreate(), MatCreateSeqAIJ(), MatSetValues(), MatMPIBAIJSetPreallocation(), MatCreateAIJ(), MPIAIJ
 @*/
