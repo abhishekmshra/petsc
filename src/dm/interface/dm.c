@@ -7027,6 +7027,7 @@ PetscErrorCode DMRemoveLabel(DM dm, const char name[], DMLabel *label)
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(dm, DM_CLASSID, 1);
+  PetscValidPointer(label, 2);
   ierr   = DMHasLabel(dm, name, &hasLabel);CHKERRQ(ierr);
   *label = NULL;
   if (!hasLabel) PetscFunctionReturn(0);
@@ -7037,11 +7038,12 @@ PetscErrorCode DMRemoveLabel(DM dm, const char name[], DMLabel *label)
       if (last) last->next       = next->next;
       else      dm->labels->next = next->next;
       next->next = NULL;
-      *label     = next->label;
       ierr = PetscStrcmp(name, "depth", &hasLabel);CHKERRQ(ierr);
       if (hasLabel) {
         dm->depthLabel = NULL;
       }
+      if (((PetscObject)next->label)->refct > 1) *label = next->label;
+      else *label = NULL;
       ierr = DMLabelDestroy(&next->label);CHKERRQ(ierr);
       ierr = PetscFree(next);CHKERRQ(ierr);
       break;
