@@ -7011,7 +7011,7 @@ PetscErrorCode DMAddLabel(DM dm, DMLabel label)
 - name - The label name
 
   Output Parameter:
-. label - The DMLabel, or NULL if the label is absent
+. label - (Optional) The DMLabel, or NULL if the label is absent
 
   Level: developer
 
@@ -7027,8 +7027,10 @@ PetscErrorCode DMRemoveLabel(DM dm, const char name[], DMLabel *label)
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(dm, DM_CLASSID, 1);
-  PetscValidPointer(label, 2);
-  *label = NULL;
+  if (label) {
+    PetscValidPointer(label, 2);
+    *label = NULL;
+  }
   while (next) {
     ierr = PetscObjectGetName((PetscObject) next->label, &lname);CHKERRQ(ierr);
     ierr = PetscStrcmp(name, lname, &hasLabel);CHKERRQ(ierr);
@@ -7040,8 +7042,10 @@ PetscErrorCode DMRemoveLabel(DM dm, const char name[], DMLabel *label)
       if (hasLabel) {
         dm->depthLabel = NULL;
       }
-      if (((PetscObject)next->label)->refct > 1) *label = next->label;
-      else *label = NULL;
+      if (label) {
+        if (((PetscObject)next->label)->refct > 1) *label = next->label;
+        else *label = NULL;
+      }
       ierr = DMLabelDestroy(&next->label);CHKERRQ(ierr);
       ierr = PetscFree(next);CHKERRQ(ierr);
       break;
