@@ -20,6 +20,7 @@ PetscErrorCode Assemble(MPI_Comm comm,PetscInt bs,MatType mtype)
   Vec               b,x,y;
   PetscInt          i;
   PetscReal         norm2,tol=10*PETSC_SMALL;
+  PetscBool         issbaij;
 #endif
   PetscViewer       viewer;
   PetscErrorCode    ierr;
@@ -42,7 +43,8 @@ PetscErrorCode Assemble(MPI_Comm comm,PetscInt bs,MatType mtype)
   ierr = PetscViewerPopFormat(viewer);CHKERRQ(ierr);
   ierr = MatView(A,viewer);CHKERRQ(ierr);
 #if defined(PETSC_HAVE_MUMPS)
-  if (mtype == MATMPISBAIJ) {
+  ierr = PetscStrcmp(mtype,MATMPISBAIJ,&issbaij);CHKERRQ(ierr);
+  if (issbaij) {
     ierr = PetscRandomCreate(PETSC_COMM_WORLD,&rdm);CHKERRQ(ierr);
     ierr = PetscRandomSetFromOptions(rdm);CHKERRQ(ierr);
     ierr = MatCreateVecs(A,&x,&y);CHKERRQ(ierr);
@@ -96,6 +98,6 @@ int main(int argc,char *argv[])
    test:
       nsize: 2
       args: -mat_ignore_lower_triangular -vecscatter_type sf
-      requires: double !complex
+      filter: sed -e "s~mem [0-9]*~mem~g"
 
 TEST*/
