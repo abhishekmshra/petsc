@@ -1944,8 +1944,7 @@ PetscErrorCode DMPlexGetRedundantDM(DM dm, PetscSF *sf, DM *redundantMesh)
 @*/
 PetscErrorCode DMPlexIsDistributed(DM dm, PetscBool *distributed)
 {
-  PetscInt          pStart, pEnd, my, received;
-  PetscBool         flg;
+  PetscInt          pStart, pEnd, count;
   MPI_Comm          comm;
   PetscErrorCode    ierr;
 
@@ -1954,10 +1953,8 @@ PetscErrorCode DMPlexIsDistributed(DM dm, PetscBool *distributed)
   PetscValidPointer(distributed,2);
   ierr = PetscObjectGetComm((PetscObject)dm,&comm);CHKERRQ(ierr);
   ierr = DMPlexGetChart(dm, &pStart, &pEnd);CHKERRQ(ierr);
-  my = pEnd - pStart;
-  ierr = MPI_Scan(&my, &received, 1, MPIU_INT, MPI_SUM, comm);CHKERRQ(ierr);
-  flg = (my && (received-my)) ? PETSC_TRUE : PETSC_FALSE;
-  ierr = MPI_Allreduce(MPI_IN_PLACE, &flg, 1, MPIU_BOOL, MPI_LOR, comm);CHKERRQ(ierr);
-  *distributed = flg;
+  count = !!(pEnd - pStart);
+  ierr = MPI_Allreduce(MPI_IN_PLACE, &count, 1, MPIU_INT, MPI_SUM, comm);CHKERRQ(ierr);
+  *distributed = count > 1 ? PETSC_TRUE : PETSC_FALSE;
   PetscFunctionReturn(0);
 }
