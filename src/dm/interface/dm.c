@@ -7008,33 +7008,54 @@ PetscErrorCode DMAddLabel(DM dm, DMLabel label)
 
   Input Parameters:
 + dm   - The DM object
-- name - The label name
+. name - (Optional) The name of the DMLabel to be removed from the DM
++ label - (Optional) The DMLabel to be removed from the DM
 
   Output Parameter:
-. label - (Optional) The DMLabel, or NULL if the label is absent
+. label - (Optional) The DMLabel, or NULL if the label is absent or destroyed by this routine
 
   Level: developer
 
-.seealso: DMCreateLabel(), DMHasLabel(), DMGetLabelValue(), DMSetLabelValue(), DMGetStratumIS()
+  Notes:
+  If neither name nor *label is specified, this function does nothing.
+  If input name is specified, the name lookup is used to find the DMLabel to be removed.
+  If input *label is specified and name is not, the PetscObjectId lookup is used; so the name is ignored, and only exactly the same instance is removed if found.
+  If both name and *label inputs are non-NULL, then input *label must match the label stored in the DM under that name.
+  If the DM has an exclusive reference to the label, it is destroyed and NULL is returned; otherwise the label is just removed from the DM, dereferenced and returned.
+
+.seealso: DMCreateLabel(), DMHasLabel(), DMGetLabelValue(), DMSetLabelValue(), DMLabelDestroy()
 @*/
 PetscErrorCode DMRemoveLabel(DM dm, const char name[], DMLabel *label)
 {
   DMLabelLink    next = dm->labels->next;
   DMLabelLink    last = NULL;
-  PetscBool      hasLabel;
-  const char    *lname;
+  PetscBool      hasLabel, labelGiven = PETSC_FALSE, nameGiven = PETSC_FALSE;
+  const char    *lname = NULL;
+  PetscObjectId  id = -1, lid = -1;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(dm, DM_CLASSID, 1);
+  if (name) {
+    PetscValidCharPointer(name, 2);
+    nameGiven = PETSC_TRUE;
+  }
   if (label) {
-    PetscValidPointer(label, 2);
-    *label = NULL;
+    PetscValidPointer(label, 3);
+    labelGiven = *label ? PETSC_TRUE : PETSC_FALSE;
+  }
+  if (!nameGiven && !labelGiven) PetscFunctionReturn(0);
+  if (labelGiven) {
+    if (!nameGiven) {ierr = PetscObjectGetName((PetscObject) *label, &name);CHKERRQ(ierr);}
+    ierr = PetscObjectGetId((PetscObject) *label, &id);CHKERRQ(ierr);
   }
   while (next) {
     ierr = PetscObjectGetName((PetscObject) next->label, &lname);CHKERRQ(ierr);
-    ierr = PetscStrcmp(name, lname, &hasLabel);CHKERRQ(ierr);
+    ierr = PetscObjectGetId((PetscObject) next->label, &lid);CHKERRQ(ierr);
+    if (nameGiven)  {ierr = PetscStrcmp(name, lname, &hasLabel);CHKERRQ(ierr);}
+    else            hasLabel = (id == lid); /* labelGiven guaranteed */
     if (hasLabel) {
+      if (labelGiven && id != lid) SETERRQ(PetscObjectComm((PetscObject)*label), PETSC_ERR_ARG_WRONG, "given label does not match the label found by given name");
       if (last) last->next       = next->next;
       else      dm->labels->next = next->next;
       next->next = NULL;
