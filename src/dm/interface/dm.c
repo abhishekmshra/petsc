@@ -7044,7 +7044,7 @@ PetscErrorCode DMRemoveLabel(DM dm, const char name[], DMLabel *label)
     ierr = PetscObjectGetName((PetscObject) next->label, &lname);CHKERRQ(ierr);
     ierr = PetscObjectGetId((PetscObject) next->label, &lid);CHKERRQ(ierr);
     if (nameGiven)  {ierr = PetscStrcmp(name, lname, &hasLabel);CHKERRQ(ierr);}
-    else            hasLabel = (id == lid); /* labelGiven guaranteed */
+    else            hasLabel = (id == lid) ? PETSC_TRUE : PETSC_FALSE; /* labelGiven guaranteed */
     if (hasLabel) {
       if (labelGiven && id != lid) SETERRQ(PetscObjectComm((PetscObject)*label), PETSC_ERR_ARG_WRONG, "given label does not match the label found by given name");
       if (last) last->next       = next->next;
