@@ -98,13 +98,9 @@ int main(int argc, char **argv)
     DMLabel label0, label1, label2;
     ierr = DMGetLabel(dm, "label0", &label0);CHKERRQ(ierr);
     ierr = DMGetLabel(dm, "label1", &label1);CHKERRQ(ierr);
-    ierr = DMRemoveLabel(dm, NULL, &label0);CHKERRQ(ierr);
-    ierr = DMRemoveLabel(dm, "label1", &label1);CHKERRQ(ierr);
+    ierr = DMRemoveLabel(dm, NULL, label0);CHKERRQ(ierr);
+    ierr = DMRemoveLabel(dm, "label1", label1);CHKERRQ(ierr);
     ierr = DMRemoveLabel(dm, "label2", NULL);CHKERRQ(ierr);
-    ierr = DMGetLabel(dm, "label2", &label2);CHKERRQ(ierr);
-    if (label0) SETERRQ(PETSC_COMM_SELF, PETSC_ERR_PLIB, "label0 must be NULL now");
-    if (label1) SETERRQ(PETSC_COMM_SELF, PETSC_ERR_PLIB, "label1 must be NULL now");
-    if (label2) SETERRQ(PETSC_COMM_SELF, PETSC_ERR_PLIB, "label2 must be NULL now");
     ierr = DMGetLabel(dm, "label0", &label0);CHKERRQ(ierr);
     ierr = DMGetLabel(dm, "label1", &label1);CHKERRQ(ierr);
     ierr = DMGetLabel(dm, "label2", &label2);CHKERRQ(ierr);

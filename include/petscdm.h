@@ -312,7 +312,7 @@ PETSC_EXTERN PetscErrorCode DMHasLabel(DM, const char [], PetscBool *);
 PETSC_EXTERN PetscErrorCode DMGetLabel(DM, const char *, DMLabel *);
 PETSC_EXTERN PetscErrorCode DMGetLabelByNum(DM, PetscInt, DMLabel *);
 PETSC_EXTERN PetscErrorCode DMAddLabel(DM, DMLabel);
-PETSC_EXTERN PetscErrorCode DMRemoveLabel(DM, const char [], DMLabel *);
+PETSC_EXTERN PetscErrorCode DMRemoveLabel(DM, const char [], DMLabel);
 PETSC_EXTERN PetscErrorCode DMCopyLabels(DM, DM);
 
 PETSC_EXTERN PetscErrorCode DMAddBoundary(DM, DMBoundaryConditionType, const char[], const char[], PetscInt, PetscInt, const PetscInt *, void (*)(void), PetscInt, const PetscInt *, void *);
