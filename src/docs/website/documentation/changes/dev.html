@@ -172,7 +172,8 @@
         </ul>
       <h4>DM/DA:</h4>
         <ul>
-          <li>DMRemoveLabel() can now lookup the DMLabel by itself (PetscObjecId lookup) or just by name (like up to now)</li>
+          <li>DMAddLabel()/DMRemoveLabel() now increment/decrement DMLabel's reference count.</li>
+          <li>DMRemoveLabel() can now lookup the DMLabel by itself or just by name (like up to now). It no longer returns the label after removal.</li>
         </ul>
       <h4>DMPlex:</h4>
         <ul>
