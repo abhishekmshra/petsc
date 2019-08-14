@@ -7019,7 +7019,6 @@ PetscErrorCode DMRemoveLabel(DM dm, const char name[], DMLabel label)
   DMLabelLink    last = NULL;
   PetscBool      hasLabel, labelGiven = PETSC_FALSE, nameGiven = PETSC_FALSE;
   const char    *lname = NULL;
-  PetscObjectId  id = -1, lid = -1;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
@@ -7035,15 +7034,13 @@ PetscErrorCode DMRemoveLabel(DM dm, const char name[], DMLabel label)
   if (!nameGiven && !labelGiven) PetscFunctionReturn(0);
   if (labelGiven) {
     if (!nameGiven) {ierr = PetscObjectGetName((PetscObject) label, &name);CHKERRQ(ierr);}
-    ierr = PetscObjectGetId((PetscObject) label, &id);CHKERRQ(ierr);
   }
   while (next) {
     ierr = PetscObjectGetName((PetscObject) next->label, &lname);CHKERRQ(ierr);
-    ierr = PetscObjectGetId((PetscObject) next->label, &lid);CHKERRQ(ierr);
     if (nameGiven)  {ierr = PetscStrcmp(name, lname, &hasLabel);CHKERRQ(ierr);}
-    else            hasLabel = (id == lid) ? PETSC_TRUE : PETSC_FALSE; /* labelGiven guaranteed */
+    else            hasLabel = (label == next->label) ? PETSC_TRUE : PETSC_FALSE; /* labelGiven guaranteed */
     if (hasLabel) {
-      if (labelGiven && id != lid) SETERRQ(PetscObjectComm((PetscObject)label), PETSC_ERR_ARG_WRONG, "given label does not match the label found by given name");
+      if (labelGiven && label != next->label) SETERRQ(PetscObjectComm((PetscObject)label), PETSC_ERR_ARG_WRONG, "given label does not match the label found by given name");
       if (last) last->next       = next->next;
       else      dm->labels->next = next->next;
       next->next = NULL;
