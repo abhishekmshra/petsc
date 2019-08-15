@@ -1,6 +1,6 @@
 DMPlexIsDistributed: FALSE
 DMPlexIsInterpolated: FALSE
-DM Object: Parallel Mesh 2 MPI processes
+DM Object: Parallel Mesh 1 MPI processes
   type: plex
 Parallel Mesh in 2 dimensions:
 Supports:
@@ -13,7 +13,6 @@ Supports:
 [0]: 5 ----> 0
 [0]: 6 ----> 1
 [0]: 7 ----> 1
-[1] Max support size: 0
 Cones:
 [0] Max cone size: 4
 [0]: 0 <---- 2 (0)
@@ -24,7 +23,6 @@ Cones:
 [0]: 1 <---- 2 (0)
 [0]: 1 <---- 6 (0)
 [0]: 1 <---- 7 (0)
-[1] Max cone size: 0
 coordinates with 1 fields
   field 0 with 2 components
 Process 0:
@@ -34,10 +32,5 @@ Process 0:
   (   5) dim  2 offset   6 -1. -0.5
   (   6) dim  2 offset   8 1. -0.5
   (   7) dim  2 offset  10 1. 0.5
-Process 1:
-PetscSF Object: 2 MPI processes
-  type: basic
-    sort=rank-order
-  PetscSFSetGraph() has not been called yet
 DMPlexIsDistributed: FALSE
 DMPlexIsInterpolated: FALSE

@@ -198,6 +198,7 @@ typedef struct {
   InterpType interpolate;                  /* Interpolate the mesh before or after DMPlexDistribute() */
   PetscBool  useGenerator;                 /* Construct mesh with a mesh generator */
   PetscBool  testOrientIF;                 /* Test for different original interface orientations */
+  PetscBool  viewDistIntp;                 /* Show results of DMIsDistributed() and DMIsInterpolated() */
   PetscInt   ornt[2];                      /* Orientation of interface on rank 0 and rank 1 */
   PetscInt   faces[3];                     /* Number of faces per dimension for generator */
   PetscReal  coords[128];
@@ -225,6 +226,7 @@ static PetscErrorCode ProcessOptions(MPI_Comm comm, AppCtx *options)
   options->interpolate  = NONE;
   options->useGenerator = PETSC_FALSE;
   options->testOrientIF = PETSC_FALSE;
+  options->viewDistIntp = PETSC_FALSE;
   options->testExpandPointsEmpty = PETSC_FALSE;
   options->ornt[0]      = 0;
   options->ornt[1]      = 0;
@@ -256,6 +258,7 @@ static PetscErrorCode ProcessOptions(MPI_Comm comm, AppCtx *options)
   if (options->nPointsToExpand) {
     ierr = PetscOptionsBool("-test_expand_points_empty", "For -test_expand_points, rank 0 will have empty input array", "ex18.c", options->testExpandPointsEmpty, &options->testExpandPointsEmpty, NULL);CHKERRQ(ierr);
   }
+  ierr = PetscOptionsBool("-view_distributed_interpolated", "Show results of DMIsDistributed() and DMIsInterpolated()", "ex18.c", options->viewDistIntp, &options->viewDistIntp, NULL);CHKERRQ(ierr);
   if (options->testOrientIF) {
     PetscInt i;
     for (i=0; i<2; i++) {
@@ -636,6 +639,7 @@ static PetscErrorCode CreateMesh(MPI_Comm comm, AppCtx *user, DM *dm)
   PetscBool      interpParallel = user->interpolate == PARALLEL ? PETSC_TRUE : PETSC_FALSE;
   const char    *filename       = user->filename;
   size_t         len;
+  PetscBool      distributed, interpolated;
   PetscMPIInt    rank;
   PetscErrorCode ierr;
 
@@ -675,6 +679,10 @@ static PetscErrorCode CreateMesh(MPI_Comm comm, AppCtx *user, DM *dm)
   ierr = PetscObjectSetName((PetscObject) *dm, "Original Mesh");CHKERRQ(ierr);
   ierr = DMViewFromOptions(*dm, NULL, "-orig_dm_view");CHKERRQ(ierr);
 
+  ierr = DMPlexIsDistributed(*dm, &distributed);CHKERRQ(ierr);
+  ierr = DMPlexIsInterpolated(*dm, &interpolated);CHKERRQ(ierr);
+  if (user->viewDistIntp) {ierr = PetscPrintf(comm, "DMPlexIsDistributed: %s\nDMPlexIsInterpolated: %s\n", PetscBools[distributed], PetscBools[interpolated]);CHKERRQ(ierr);}
+
   if (user->distribute) {
     DM               pdm = NULL;
     PetscPartitioner part;
@@ -706,6 +714,10 @@ static PetscErrorCode CreateMesh(MPI_Comm comm, AppCtx *user, DM *dm)
   ierr = PetscObjectSetName((PetscObject) *dm, "Parallel Mesh");CHKERRQ(ierr);
   ierr = DMSetFromOptions(*dm);CHKERRQ(ierr);
   ierr = DMViewFromOptions(*dm, NULL, "-dm_view");CHKERRQ(ierr);
+
+  ierr = DMPlexIsDistributed(*dm, &distributed);CHKERRQ(ierr);
+  ierr = DMPlexIsInterpolated(*dm, &interpolated);CHKERRQ(ierr);
+  if (user->viewDistIntp) {ierr = PetscPrintf(comm, "DMPlexIsDistributed: %s\nDMPlexIsInterpolated: %s\n", PetscBools[distributed], PetscBools[interpolated]);CHKERRQ(ierr);}
   PetscFunctionReturn(0);
 }
 
@@ -876,14 +888,20 @@ int main(int argc, char **argv)
 
   testset:
     requires: exodusii
-    nsize: 2
     args: -filename ${wPETSC_DIR}/share/petsc/datafiles/meshes/TwoQuads.exo
     args: -dm_view ascii::ascii_info_detail -dm_plex_check_symmetry -dm_plex_check_skeleton -dm_plex_check_geometry
+    args: -view_distributed_interpolated
+    test:
+      suffix: 5_seq
+      nsize: 1
+      args: -distribute 0 -interpolate {{none serial}separate output}
     test:
       suffix: 5_dist0
+      nsize: 2
       args: -distribute 0 -interpolate {{none serial}separate output}
     test:
       suffix: 5_dist1
+      nsize: 2
       args: -distribute 1 -interpolate {{none serial parallel}separate output}
 
   testset:
@@ -971,5 +989,36 @@ int main(int argc, char **argv)
     args: -distribute 0 -interpolate serial
     args: -view_vertices_from_coords 0.,1.,0.,-0.5,1.,0.,0.583,-0.644,0.,-2.,-2.,-2. -view_vertices_from_coords_tol 1e-3
 
+  testset:
+    requires: hdf5 !complex datafilespath
+    #TODO DMPlexCheckPointSF() fails for nsize 4
+    nsize: {{1 2}}
+    args: -dm_plex_check_symmetry -dm_plex_check_skeleton -dm_plex_check_geometry
+    args: -filename ${DATAFILESPATH}/meshes/cube-hexahedra-refined.h5 -dm_plex_create_from_hdf5_xdmf -dm_plex_hdf5_topology_path /cells -dm_plex_hdf5_geometry_path /coordinates
+    test:
+      suffix: 9_hdf5_seqload
+      args: -distribute -petscpartitioner_type simple
+      args: -interpolate {{none serial parallel}}
+      args: -dm_plex_hdf5_force_sequential
+    test:
+      suffix: 9_hdf5_seqload_metis
+      requires: parmetis
+      args: -distribute -petscpartitioner_type parmetis
+      args: -interpolate {{serial parallel}}
+      args: -dm_plex_hdf5_force_sequential
+    test:
+      suffix: 9_hdf5
+      args: -interpolate {{none serial}}  #TODO serial means before DMPlexDistribute but plex is already parallel from DMLoad - serial/parallel should be renamed
+    test:
+      suffix: 9_hdf5_repart
+      requires: parmetis
+      args: -distribute -petscpartitioner_type parmetis
+      args: -interpolate {{serial}}  #TODO parallel means after DMPlexDistribute but plex is already parallel from DMLoad - serial/parallel should be renamed
+    test:
+      TODO: Parallel partitioning of uninterpolated meshes not supported
+      suffix: 9_hdf5_repart_ppu
+      requires: parmetis
+      args: -distribute -petscpartitioner_type parmetis
+      args: -interpolate {{none parallel}}  #TODO parallel means after DMPlexDistribute but plex is already parallel from DMLoad - serial/parallel should be renamed
 
 TEST*/
