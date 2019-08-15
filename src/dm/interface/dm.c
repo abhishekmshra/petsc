@@ -568,7 +568,7 @@ static PetscErrorCode DMCountNonCyclicReferences(DM dm, PetscBool recurseCoarse,
   PetscFunctionReturn(0);
 }
 
-PetscErrorCode DMDestroyLabelLinkList_Internal(DM dm)
+PetscErrorCode DMDestroyLabelLinkList(DM dm)
 {
   PetscErrorCode ierr;
 
@@ -698,11 +698,20 @@ PetscErrorCode  DMDestroy(DM *dm)
     }
     (*dm)->workin = NULL;
   }
-  /* destroy the labels */
-  ierr = DMDestroyLabelLinkList_Internal(*dm);CHKERRQ(ierr);
-  /* destroy the fields */
+  if (!--((*dm)->labels->refct)) {
+    DMLabelLink next = (*dm)->labels->next;
+
+    /* destroy the labels */
+    while (next) {
+      DMLabelLink tmp = next->next;
+
+      ierr = DMLabelDestroy(&next->label);CHKERRQ(ierr);
+      ierr = PetscFree(next);CHKERRQ(ierr);
+      next = tmp;
+    }
+    ierr = PetscFree((*dm)->labels);CHKERRQ(ierr);
+  }
   ierr = DMClearFields(*dm);CHKERRQ(ierr);
-  /* destroy the boundaries */
   {
     DMBoundary next = (*dm)->boundary;
     while (next) {
@@ -6988,7 +6997,6 @@ PetscErrorCode DMAddLabel(DM dm, DMLabel label)
   tmpLabel->output = PETSC_TRUE;
   tmpLabel->next   = dm->labels->next;
   dm->labels->next = tmpLabel;
-  ierr = PetscObjectReference((PetscObject)label);CHKERRQ(ierr);
   PetscFunctionReturn(0);
 }
 
@@ -6999,66 +7007,40 @@ PetscErrorCode DMAddLabel(DM dm, DMLabel label)
 
   Input Parameters:
 + dm   - The DM object
-. name - (Optional) The name of the DMLabel to be removed from the DM
-+ label - (Optional) The DMLabel to be removed from the DM
+- name - The label name
 
   Output Parameter:
-. label - (Optional) The DMLabel, or NULL if the label is absent or destroyed by this routine
+. label - The DMLabel, or NULL if the label is absent
 
   Level: developer
 
-  Notes:
-  If neither name nor *label is specified, this function does nothing.
-  If input name is specified, the name lookup is used to find the DMLabel to be removed.
-  If input *label is specified and name is not, the PetscObjectId lookup is used; so the name is ignored, and only exactly the same instance is removed if found.
-  If both name and *label inputs are non-NULL, then input *label must match the label stored in the DM under that name.
-  If the DM has an exclusive reference to the label, it is destroyed and NULL is returned; otherwise the label is just removed from the DM, dereferenced and returned.
-
-.seealso: DMCreateLabel(), DMHasLabel(), DMGetLabelValue(), DMSetLabelValue(), DMLabelDestroy()
+.seealso: DMCreateLabel(), DMHasLabel(), DMGetLabelValue(), DMSetLabelValue(), DMGetStratumIS()
 @*/
 PetscErrorCode DMRemoveLabel(DM dm, const char name[], DMLabel *label)
 {
   DMLabelLink    next = dm->labels->next;
   DMLabelLink    last = NULL;
-  PetscBool      hasLabel, labelGiven = PETSC_FALSE, nameGiven = PETSC_FALSE;
-  const char    *lname = NULL;
-  PetscObjectId  id = -1, lid = -1;
+  PetscBool      hasLabel;
+  const char    *lname;
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(dm, DM_CLASSID, 1);
-  if (name) {
-    PetscValidCharPointer(name, 2);
-    nameGiven = PETSC_TRUE;
-  }
-  if (label) {
-    PetscValidPointer(label, 3);
-    labelGiven = *label ? PETSC_TRUE : PETSC_FALSE;
-  }
-  if (!nameGiven && !labelGiven) PetscFunctionReturn(0);
-  if (labelGiven) {
-    if (!nameGiven) {ierr = PetscObjectGetName((PetscObject) *label, &name);CHKERRQ(ierr);}
-    ierr = PetscObjectGetId((PetscObject) *label, &id);CHKERRQ(ierr);
-  }
+  ierr   = DMHasLabel(dm, name, &hasLabel);CHKERRQ(ierr);
+  *label = NULL;
+  if (!hasLabel) PetscFunctionReturn(0);
   while (next) {
     ierr = PetscObjectGetName((PetscObject) next->label, &lname);CHKERRQ(ierr);
-    ierr = PetscObjectGetId((PetscObject) next->label, &lid);CHKERRQ(ierr);
-    if (nameGiven)  {ierr = PetscStrcmp(name, lname, &hasLabel);CHKERRQ(ierr);}
-    else            hasLabel = (id == lid) ? PETSC_TRUE : PETSC_FALSE; /* labelGiven guaranteed */
+    ierr = PetscStrcmp(name, lname, &hasLabel);CHKERRQ(ierr);
     if (hasLabel) {
-      if (labelGiven && id != lid) SETERRQ(PetscObjectComm((PetscObject)*label), PETSC_ERR_ARG_WRONG, "given label does not match the label found by given name");
       if (last) last->next       = next->next;
       else      dm->labels->next = next->next;
       next->next = NULL;
+      *label     = next->label;
       ierr = PetscStrcmp(name, "depth", &hasLabel);CHKERRQ(ierr);
       if (hasLabel) {
         dm->depthLabel = NULL;
       }
-      if (label) {
-        if (((PetscObject)next->label)->refct > 1) *label = next->label;
-        else *label = NULL;
-      }
-      ierr = DMLabelDestroy(&next->label);CHKERRQ(ierr);
       ierr = PetscFree(next);CHKERRQ(ierr);
       break;
     }
@@ -7178,7 +7160,6 @@ PetscErrorCode DMCopyLabels(DM dmA, DM dmB)
     ierr = DMGetLabel(dmA, name, &label);CHKERRQ(ierr);
     ierr = DMLabelDuplicate(label, &labelNew);CHKERRQ(ierr);
     ierr = DMAddLabel(dmB, labelNew);CHKERRQ(ierr);
-    ierr = DMLabelDestroy(&labelNew);CHKERRQ(ierr);
   }
   PetscFunctionReturn(0);
 }

@@ -1644,36 +1644,3 @@ PetscErrorCode DMPlexUninterpolate(DM dm, DM *dmUnint)
   *dmUnint = udm;
   PetscFunctionReturn(0);
 }
-
-/*@
-  DMPlexIsInterpolated - Find out whether this DM is interpolated, i.e. number of strata is equal to dimension.
-
-  Input Parameter:
-. dm      - The DM object
-
-  Output Parameter:
-. interpolated - Flag whether the DM is interpolated
-
-  Level: intermediate
-
-.seealso: DMPlexInterpolate()
-@*/
-PetscErrorCode DMPlexIsInterpolated(DM dm, PetscBool *interpolated)
-{
-  PetscBool      lflg,flg;
-  PetscInt       depth, dim;
-  MPI_Comm       comm;
-  PetscErrorCode ierr;
-
-  PetscFunctionBegin;
-  PetscValidHeaderSpecific(dm, DM_CLASSID, 1);
-  PetscValidPointer(interpolated,2);
-  ierr = PetscObjectGetComm((PetscObject)dm, &comm);CHKERRQ(ierr);
-  ierr = DMPlexGetDepth(dm, &depth);CHKERRQ(ierr);
-  ierr = DMGetDimension(dm, &dim);CHKERRQ(ierr);
-  lflg = ((depth == dim) || (dim <= 1)) ? PETSC_TRUE : PETSC_FALSE;
-  ierr = MPI_Allreduce(&lflg, &flg, 1, MPIU_BOOL, MPI_LAND, comm);CHKERRQ(ierr);
-  if (!flg && lflg) SETERRQ(PETSC_COMM_SELF, PETSC_ERR_PLIB, "this partition is interpolated while at least one other is not");
-  *interpolated = flg;
-  PetscFunctionReturn(0);
-}
