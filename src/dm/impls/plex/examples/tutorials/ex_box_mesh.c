@@ -1,10 +1,10 @@
-static char help[] = "Creating a box mesh\n\n";
+static char help[] = "Creating a box mesh and refining\n\n";
 
 #include <petscdmplex.h>
-#include<petscdmlabel.h>
+
 int main(int argc, char **argv)
 {
-  DM             dm, dmDist = NULL;
+  DM             dm, dmf, dmDist = NULL;
   Vec            u;
   PetscViewer    viewer;
   PetscInt	 dim = 2;
@@ -18,15 +18,18 @@ int main(int argc, char **argv)
   ierr = DMPlexDistribute(dm, 0, NULL, &dmDist);CHKERRQ(ierr);
   if (dmDist) {ierr = DMDestroy(&dm);CHKERRQ(ierr); dm = dmDist;}
   /* Create a Vec with this layout and view it */
-  ierr = DMGetGlobalVector(dm, &u);CHKERRQ(ierr);
+  ierr = DMRefine(dm, PETSC_COMM_WORLD, &dmf);CHKERRQ(ierr);
+  ierr = DMGetGlobalVector(dmf, &u);CHKERRQ(ierr);
   ierr = PetscViewerCreate(PETSC_COMM_WORLD, &viewer);CHKERRQ(ierr);
 //  ierr = PetscViewerSetType(viewer, PETSCVIEWERASCII);CHKERRQ(ierr);
 //  ierr = PetscViewerPushFormat(viewer, PETSC_VIEWER_DEFAULT);CHKERRQ(ierr);
   ierr = VecView(u, viewer);CHKERRQ(ierr);
+  ierr = DMViewFromOptions(dmf, NULL, "-dmf_view");CHKERRQ(ierr);
   ierr = DMViewFromOptions(dm, NULL, "-dm_view");CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
-  ierr = DMRestoreGlobalVector(dm, &u);CHKERRQ(ierr);
+  ierr = DMRestoreGlobalVector(dmf, &u);CHKERRQ(ierr);
   /* Cleanup */
+  ierr = DMDestroy(&dmf);CHKERRQ(ierr);
   ierr = DMDestroy(&dm);CHKERRQ(ierr);
   ierr = PetscFinalize();
   return ierr;
