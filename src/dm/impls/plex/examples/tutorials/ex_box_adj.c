@@ -1,13 +1,14 @@
-static char help[] = "Creating a box mesh\n\n";
+static char help[] = "Creating a box mesh and getting neighbor node information\n\n";
 
 #include <petscdmplex.h>
-#include<petscdmlabel.h>
+#include <petscdmlabel.h>
+
 int main(int argc, char **argv)
 {
   DM             dm, dmDist = NULL;
   Vec            u;
   PetscViewer    viewer;
-  PetscInt	 dim = 2, p = 12, adjSize, *adj;
+  PetscInt	 dim = 2, p = 6, adjSize, *adj = NULL, pstart, pend;
   PetscBool      interpolate = PETSC_TRUE;
   PetscErrorCode ierr;
 
@@ -20,13 +21,16 @@ int main(int argc, char **argv)
   if (dmDist) {ierr = DMDestroy(&dm);CHKERRQ(ierr); dm = dmDist;}
   /* Create a Vec with this layout and view it */
   ierr = DMPlexGetAdjacency(dm, p, &adjSize, &adj);CHKERRQ(ierr);
+  ierr = DMPlexGetChart(dm, &pstart, &pend);CHKERRQ(ierr);
   ierr = DMGetGlobalVector(dm, &u);CHKERRQ(ierr);
   ierr = PetscViewerCreate(PETSC_COMM_WORLD, &viewer);CHKERRQ(ierr);
-//  ierr = PetscViewerSetType(viewer, PETSCVIEWERASCII);CHKERRQ(ierr);
-//  ierr = PetscViewerPushFormat(viewer, PETSC_VIEWER_DEFAULT);CHKERRQ(ierr);
+  ierr = PetscViewerSetType(viewer, PETSCVIEWERVTK);CHKERRQ(ierr);
+  ierr = PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_VTK);CHKERRQ(ierr);
+  ierr = PetscViewerFileSetName(viewer, "sol.vtk");CHKERRQ(ierr);
   ierr = VecView(u, viewer);CHKERRQ(ierr);
   ierr = DMViewFromOptions(dm, NULL, "-dm_view");CHKERRQ(ierr);
-  ierr = PetscPrintf(PETSC_COMM_WORLD, "Adj %D\n",adj);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD, "Start Point: %D, End Point: %D\n",pstart,pend);CHKERRQ(ierr);
+  ierr = PetscPrintf(PETSC_COMM_WORLD, "The adjacenct points of point num. %D are %D\n",p,adj);CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
   ierr = DMRestoreGlobalVector(dm, &u);CHKERRQ(ierr);
   ierr = PetscFree(adj);CHKERRQ(ierr);
