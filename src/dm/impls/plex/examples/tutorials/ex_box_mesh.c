@@ -27,10 +27,12 @@ int main(int argc, char **argv)
   /* Create a Vec with this layout and view it */
   ierr = DMLabelCreate(PETSC_COMM_SELF,"adapt",&adaptLabel);CHKERRQ(ierr);
   ierr = DMLabelSetValue(adaptLabel,2,DM_ADAPT_REFINE);CHKERRQ(ierr);
+  ierr = DMLabelSetValue(adaptLabel,4,DM_ADAPT_REFINE);CHKERRQ(ierr);
   ierr = DMAddLabel(dm,adaptLabel);CHKERRQ(ierr);
   ierr = DMAdaptLabel(dm, adaptLabel, &dm);CHKERRQ(ierr);
 //  ierr = DMRefine(dm, PETSC_COMM_WORLD, &dm);CHKERRQ(ierr);
 //  ierr = DMRefine(dm, PETSC_COMM_WORLD, &dm);CHKERRQ(ierr);
+  ierr = DMPlexRefineSimplexToTensor(dm, &dm);CHKERRQ(ierr);
   ierr = DMGetGlobalVector(dm, &u);CHKERRQ(ierr);
 
 //  ierr = VecTaggerCreate(PETSC_COMM_WORLD,&refineTag);CHKERRQ(ierr);
