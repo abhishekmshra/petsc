@@ -1,4 +1,4 @@
-static char help[] = "Creating a box mesh and refining\n\n";
+static char help[] = "Creating a box mesh and adaptively refining using p4est\n\n";
 
 #include <petscdmplex.h>
 #include <petscdmforest.h>
@@ -8,12 +8,12 @@ static char help[] = "Creating a box mesh and refining\n\n";
 
 int main(int argc, char **argv)
 {
-  DM             dm, base, preforest, postforest;
+  DM             dm, base, preforest, postforest, pf2;
   Vec            u;
   PetscViewer    viewer;
-  PetscInt	 nRefine, dim = 2;
+  PetscInt	 dim = 2;
   PetscBool      interpolate = PETSC_TRUE;
-  DMLabel	 adaptLabel = NULL;
+  DMLabel	 adaptLabel = NULL, aL2 = NULL;
   PetscErrorCode ierr;
 
   ierr = PetscInitialize(&argc, &argv, NULL,help);if (ierr) return ierr;
@@ -29,37 +29,34 @@ int main(int argc, char **argv)
   ierr = DMForestSetBaseDM(preforest, base);CHKERRQ(ierr);
   ierr = DMSetUp(preforest);CHKERRQ(ierr);
   ierr = DMDestroy(&base);CHKERRQ(ierr);
-//  ierr = DMForestTemplate(dm, PETSC_COMM_WORLD, &dmf);
 
   /* Create a Vec with this layout and view it */
   ierr = DMLabelCreate(PETSC_COMM_SELF,"adapt",&adaptLabel);CHKERRQ(ierr);
 
   ierr = DMLabelSetValue(adaptLabel,1,DM_ADAPT_REFINE);CHKERRQ(ierr);
   ierr = DMLabelSetValue(adaptLabel,15,DM_ADAPT_REFINE);CHKERRQ(ierr);
-//  ierr = DMLabelGetValue(adaptLabel,1,&value);CHKERRQ(ierr);
-//  ierr = DMAdaptLabel(dm, adaptLabel, &dm);CHKERRQ(ierr);
-  //ierr = DMRefine(dm, PETSC_COMM_WORLD, &dm);CHKERRQ(ierr);
-//  ierr = DMGetGlobalVector(dm, &u);CHKERRQ(ierr);
 
   ierr = DMForestTemplate(preforest, PETSC_COMM_WORLD, &postforest);CHKERRQ(ierr);
   ierr = DMDestroy(&preforest);CHKERRQ(ierr);
   ierr = DMForestSetAdaptivityLabel(postforest,adaptLabel);CHKERRQ(ierr);
   ierr = DMSetUp(postforest);CHKERRQ(ierr);
-  ierr = DMForestSetAdaptivityLabel(postforest,adaptLabel);CHKERRQ(ierr);
-  ierr = DMSetUp(postforest);CHKERRQ(ierr);
 
+  ierr = DMLabelCreate(PETSC_COMM_SELF,"adapt",&aL2);CHKERRQ(ierr);
+  ierr = DMLabelSetValue(aL2,2,DM_ADAPT_REFINE);CHKERRQ(ierr);
 
-//  ierr = DMAdaptLabel(dm, adaptLabel, &dm);CHKERRQ(ierr);
-
-
-  ierr = DMConvert(postforest, DMPLEX, &dm);CHKERRQ(ierr);
+  ierr = DMForestTemplate(postforest, PETSC_COMM_WORLD, &pf2);CHKERRQ(ierr);
   ierr = DMDestroy(&postforest);CHKERRQ(ierr);
+  ierr = DMForestSetAdaptivityLabel(pf2,aL2);CHKERRQ(ierr);
+  ierr = DMSetUp(pf2);CHKERRQ(ierr);
+
+  ierr = DMConvert(pf2, DMPLEX, &dm);CHKERRQ(ierr);
+  ierr = DMDestroy(&pf2);CHKERRQ(ierr);
+  ierr = DMGetGlobalVector(dm, &u);CHKERRQ(ierr);
   ierr = PetscViewerCreate(PETSC_COMM_WORLD, &viewer);CHKERRQ(ierr);
-//  ierr = VecView(u, viewer);CHKERRQ(ierr);
-//  ierr = PetscPrintf(PETSC_COMM_WORLD, "nRefine: %D",nRefine);CHKERRQ(ierr);
+  ierr = VecView(u, viewer);CHKERRQ(ierr);
   ierr = DMViewFromOptions(dm, NULL, "-dm_view");CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
-//  ierr = DMRestoreGlobalVector(dm, &u);CHKERRQ(ierr);
+  ierr = DMRestoreGlobalVector(dm, &u);CHKERRQ(ierr);
   /* Cleanup */
   ierr = DMDestroy(&dm);CHKERRQ(ierr);
   ierr = PetscFinalize();
