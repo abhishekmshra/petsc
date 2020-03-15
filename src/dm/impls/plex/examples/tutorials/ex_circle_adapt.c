@@ -92,8 +92,6 @@ int main(int argc, char **argv)
     ierr = DMForestSetAdaptivityLabel(postforest,adaptLabel);CHKERRQ(ierr);
     ierr = DMSetUp(postforest);CHKERRQ(ierr);
 
-    ierr = DMForestGetCellChart(postforest, &cstart, &cend);CHKERRQ(ierr);
-
     ierr = DMForestTemplate(postforest, PETSC_COMM_WORLD, &preforest);CHKERRQ(ierr);
     ierr = DMDestroy(&postforest);CHKERRQ(ierr);
     ierr = DMSetUp(preforest);CHKERRQ(ierr);
