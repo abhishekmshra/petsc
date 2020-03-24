@@ -53,7 +53,7 @@ static PetscErrorCode AdaptiveCircumferenceRefinement(DM forest, PetscInt p, Pet
 
 int main(int argc, char **argv)
 {
-  DM             dm, base, preforest, postforest;
+  DM             dm, dmDist, base, preforest, postforest;
   PetscInt	 dim = 2, n, xcenter, ycenter, p = 1, nrefine = 4;
   PetscReal      lower[2] = {0,0}, upper[2] = {4,4};
   PetscBool      interpolate = PETSC_TRUE;
@@ -72,6 +72,12 @@ int main(int argc, char **argv)
 
   /* Create a base DMPlex mesh */
   ierr = DMPlexCreateBoxMesh(PETSC_COMM_WORLD, dim, PETSC_FALSE, NULL, lower, upper, NULL, interpolate, &base);CHKERRQ(ierr);
+  ierr = DMPlexDistribute(base, 0, NULL, &dmDist);CHKERRQ(ierr);
+  if (dmDist)
+  {
+    ierr = DMDestroy(&base);CHKERRQ(ierr);
+    base = dmDist;
+  }
   ierr = DMGetDimension(base,&dim);CHKERRQ(ierr);
   /* Covert Plex mesh to Forest and destroy base */
   ierr = DMCreate(PETSC_COMM_WORLD, &preforest);CHKERRQ(ierr);
@@ -100,6 +106,7 @@ int main(int argc, char **argv)
   /* Convert Forest back to Plex for visualization */
   ierr = DMConvert(preforest, DMPLEX, &dm);CHKERRQ(ierr);
   ierr = DMDestroy(&preforest);CHKERRQ(ierr);
+
   /* DM View */
   ierr = DMViewFromOptions(dm, NULL, "-dm_view");CHKERRQ(ierr);
 
