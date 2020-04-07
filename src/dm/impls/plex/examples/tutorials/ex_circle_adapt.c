@@ -12,7 +12,7 @@ typedef struct {
 } Ctx;
 
 
-static PetscErrorCode RefineCircumference(PetscInt c, DM cdm, Vec coordinates, DMLabel *label, void *ictx)
+static PetscErrorCode RefineCircumference(PetscInt c, DM cdm, Vec coordinates, PetscInt *label, void *ictx)
 {
   Ctx         *ctx = (Ctx*)ictx;
   PetscInt    csize, xcenter = ctx->xcenter, ycenter = ctx->ycenter, p = ctx->p;
@@ -36,18 +36,18 @@ static PetscErrorCode RefineCircumference(PetscInt c, DM cdm, Vec coordinates, D
 
   min = PetscMin(PetscMin(S1, S2), PetscMin(S3, S4));
 
-  if (min<diag) {ierr = DMLabelSetValue(*label,c,DM_ADAPT_REFINE);CHKERRQ(ierr);}
-  else {ierr = DMLabelSetValue(*label,c,DM_ADAPT_KEEP);CHKERRQ(ierr);}
+  if (min<diag) {*label = DM_ADAPT_REFINE;}
+  else {*label = DM_ADAPT_KEEP;}
 
   ierr = DMPlexVecRestoreClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
   return(0);
 }
 
-static PetscErrorCode SetAdaptRefineLabel(DM forest, DMLabel *adaptLabel, PetscErrorCode (*label)(PetscInt, DM, Vec, DMLabel *, void *), void *ctx)
+static PetscErrorCode SetAdaptRefineLabel(DM forest, DMLabel *adaptLabel, PetscErrorCode (*GetLabelValue)(PetscInt, DM, Vec, PetscInt *, void *), void *ctx)
 {
   DM             cdm;
   Vec            coordinates;
-  PetscInt       c, cstart, cend;
+  PetscInt       c, cstart, cend, label;
   PetscErrorCode ierr;
 
   ierr = DMForestGetCellChart(forest, &cstart, &cend);CHKERRQ(ierr);
@@ -57,7 +57,8 @@ static PetscErrorCode SetAdaptRefineLabel(DM forest, DMLabel *adaptLabel, PetscE
 
   for (c = cstart; c < cend; ++c)
   {
-    RefineCircumference(c, cdm, coordinates, adaptLabel, ctx);
+    ierr = GetLabelValue(c, cdm, coordinates, &label, ctx);CHKERRQ(ierr);
+    ierr = DMLabelSetValue(*adaptLabel, c, label);CHKERRQ(ierr);
   }
 
   return(0);
