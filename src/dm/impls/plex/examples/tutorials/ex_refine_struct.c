@@ -28,7 +28,7 @@ static PetscErrorCode RefineTopEdge(PetscInt c, DM cdm, Vec coordinates, PetscIn
   ierr = DMPlexVecGetClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
   y3 = PetscRealPart(coords[5]);
 
-  if (y3 == ytop || *label == DM_ADAPT_REFINE) {*label = DM_ADAPT_REFINE;}
+  if (y3 == ytop) {*label = DM_ADAPT_REFINE;}
   else {*label = DM_ADAPT_KEEP;}
 
   ierr = DMPlexVecRestoreClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
@@ -47,7 +47,7 @@ static PetscErrorCode RefineRightEdge(PetscInt c, DM cdm, Vec coordinates, Petsc
   ierr = DMPlexVecGetClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
   x2 = PetscRealPart(coords[2]);
 
-  if (x2 == xright || *label == DM_ADAPT_REFINE) {*label = DM_ADAPT_REFINE;}
+  if (x2 == xright) {*label = DM_ADAPT_REFINE;}
   else {*label = DM_ADAPT_KEEP;}
 
   ierr = DMPlexVecRestoreClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
@@ -78,7 +78,7 @@ static PetscErrorCode RefineCircumference(PetscInt c, DM cdm, Vec coordinates, P
 
   min = PetscMin(PetscMin(S1, S2), PetscMin(S3, S4));
 
-  if (min<diag || *label == DM_ADAPT_REFINE) {*label = DM_ADAPT_REFINE;}
+  if (min<diag) {*label = DM_ADAPT_REFINE;}
   else {*label = DM_ADAPT_KEEP;}
 
   ierr = DMPlexVecRestoreClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
@@ -89,7 +89,7 @@ static PetscErrorCode SetAdaptRefineLabel(DM *preforest, DMLabel *adaptLabel, Pe
 {
   DM             cdm, postforest;
   Vec            coordinates;
-  PetscInt       c, cstart, cend, label;
+  PetscInt       c, cstart, cend, label_val, curr_label;
   PetscErrorCode ierr;
 
   ierr = DMForestGetCellChart(*preforest, &cstart, &cend);CHKERRQ(ierr);
@@ -99,13 +99,15 @@ static PetscErrorCode SetAdaptRefineLabel(DM *preforest, DMLabel *adaptLabel, Pe
 
   for (c = cstart; c < cend; ++c)
   {
-    label = DM_ADAPT_KEEP; /* Initialize label = 0 */
+    label_val = DM_ADAPT_KEEP; /* Initialize label = 0 */
 
     for (PetscInt i = 0; i < n; ++i)
     {
-      ierr = refineFuncs[i](c, cdm, coordinates, &label, ctx);CHKERRQ(ierr);
+      ierr = refineFuncs[i](c, cdm, coordinates, &curr_label, ctx);CHKERRQ(ierr);
+      if (label_val == DM_ADAPT_REFINE || curr_label == DM_ADAPT_REFINE) {label_val = DM_ADAPT_REFINE;}
+      else {label_val = DM_ADAPT_KEEP;}
     }
-      ierr = DMLabelSetValue(*adaptLabel, c, label);CHKERRQ(ierr);
+      ierr = DMLabelSetValue(*adaptLabel, c, label_val);CHKERRQ(ierr);
   }
 
   /* Apply adaptLabel to the forest and set up */
@@ -133,7 +135,7 @@ int main(int argc, char **argv)
 {
   DM             dm, dmDist, base, forest;
   PetscInt	 dim = 2, n, nrefine = 4;
-  PetscReal      lower[2] = {0,0}, upper[2] = {6,10};
+  PetscReal      lower[2] = {0,0}, upper[2] = {10,10};
   PetscBool      interpolate = PETSC_TRUE;
   DMLabel        adaptLabel = NULL;
   Ctx            ctx;
