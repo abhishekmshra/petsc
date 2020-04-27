@@ -8,15 +8,18 @@ static char help[] = "Adaptively refine mesh using mutiple external refinement f
 #include <petscmath.h>
 
 typedef struct {
-  PetscErrorCode (**refineFuncs)(PetscInt, DM, Vec, PetscInt *, void *);
-  PetscInt       n; /* Number of functions */
-} _RefinementFuncs;
-
-typedef struct {
   PetscInt       p, xcenter, ycenter, ytop, xright;
 } Ctx;
 
-static PetscErrorCode RefineTopEdge(PetscInt c, DM cdm, Vec coordinates, PetscInt *label, void *ictx)
+struct _refinement_funcs_struct{
+  PetscErrorCode (**refineFuncs)(PetscInt, DM, Vec, PetscInt *, void *);
+  Ctx            **ctx;
+  PetscInt       n; /* Number of functions */
+};
+
+typedef struct _refinement_funcs_struct RefinementFunctions;
+
+static PetscErrorCode RefineTopEdge(PetscInt c, DM cdm, Vec coordinates, PetscInt *label_val, void *ictx)
 {
   Ctx            *ctx = (Ctx*)ictx;
   PetscInt       csize;
@@ -28,14 +31,14 @@ static PetscErrorCode RefineTopEdge(PetscInt c, DM cdm, Vec coordinates, PetscIn
   ierr = DMPlexVecGetClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
   y3 = PetscRealPart(coords[5]);
 
-  if (y3 == ytop) {*label = DM_ADAPT_REFINE;}
-  else {*label = DM_ADAPT_KEEP;}
+  if (y3 == ytop) {*label_val = DM_ADAPT_REFINE;}
+  else {*label_val = DM_ADAPT_KEEP;}
 
   ierr = DMPlexVecRestoreClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
   return(0);
 }
 
-static PetscErrorCode RefineRightEdge(PetscInt c, DM cdm, Vec coordinates, PetscInt *label, void *ictx)
+static PetscErrorCode RefineRightEdge(PetscInt c, DM cdm, Vec coordinates, PetscInt *label_val, void *ictx)
 {
   Ctx            *ctx = (Ctx*)ictx;
   PetscInt       csize;
@@ -47,14 +50,14 @@ static PetscErrorCode RefineRightEdge(PetscInt c, DM cdm, Vec coordinates, Petsc
   ierr = DMPlexVecGetClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
   x2 = PetscRealPart(coords[2]);
 
-  if (x2 == xright) {*label = DM_ADAPT_REFINE;}
-  else {*label = DM_ADAPT_KEEP;}
+  if (x2 == xright) {*label_val = DM_ADAPT_REFINE;}
+  else {*label_val = DM_ADAPT_KEEP;}
 
   ierr = DMPlexVecRestoreClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
   return(0);
 }
 
-static PetscErrorCode RefineCircumference(PetscInt c, DM cdm, Vec coordinates, PetscInt *label, void *ictx)
+static PetscErrorCode RefineCircumference(PetscInt c, DM cdm, Vec coordinates, PetscInt *label_val, void *ictx)
 {
   Ctx            *ctx = (Ctx*)ictx;
   PetscInt       csize, xcenter = ctx->xcenter, ycenter = ctx->ycenter, p = ctx->p;
@@ -78,18 +81,18 @@ static PetscErrorCode RefineCircumference(PetscInt c, DM cdm, Vec coordinates, P
 
   min = PetscMin(PetscMin(S1, S2), PetscMin(S3, S4));
 
-  if (min<diag) {*label = DM_ADAPT_REFINE;}
-  else {*label = DM_ADAPT_KEEP;}
+  if (min<diag) {*label_val = DM_ADAPT_REFINE;}
+  else {*label_val = DM_ADAPT_KEEP;}
 
   ierr = DMPlexVecRestoreClosure(cdm, NULL, coordinates, c, &csize, &coords);CHKERRQ(ierr);
   return(0);
 }
 
-static PetscErrorCode SetAdaptRefineLabel(DM *preforest, DMLabel *adaptLabel, PetscErrorCode (**refineFuncs)(PetscInt, DM, Vec, PetscInt *, void *), PetscInt n, void *ctx)
+static PetscErrorCode SetAdaptRefineLabel(DM *preforest, DMLabel *adaptLabel, RefinementFunctions *RF)
 {
   DM             cdm, postforest;
   Vec            coordinates;
-  PetscInt       c, cstart, cend, label_val, curr_label;
+  PetscInt       i, c, cstart, cend, label_val, curr_label;
   PetscErrorCode ierr;
 
   ierr = DMForestGetCellChart(*preforest, &cstart, &cend);CHKERRQ(ierr);
@@ -100,14 +103,13 @@ static PetscErrorCode SetAdaptRefineLabel(DM *preforest, DMLabel *adaptLabel, Pe
   for (c = cstart; c < cend; ++c)
   {
     label_val = DM_ADAPT_KEEP; /* Initialize label = 0 */
-
-    for (PetscInt i = 0; i < n; ++i)
+    for (i = 0; i < RF->n; ++i)
     {
-      ierr = refineFuncs[i](c, cdm, coordinates, &curr_label, ctx);CHKERRQ(ierr);
+      ierr = RF->refineFuncs[i](c, cdm, coordinates, &curr_label, RF->ctx[i]);CHKERRQ(ierr);
       if (label_val == DM_ADAPT_REFINE || curr_label == DM_ADAPT_REFINE) {label_val = DM_ADAPT_REFINE;}
       else {label_val = DM_ADAPT_KEEP;}
     }
-      ierr = DMLabelSetValue(*adaptLabel, c, label_val);CHKERRQ(ierr);
+    ierr = DMLabelSetValue(*adaptLabel, c, label_val);CHKERRQ(ierr);
   }
 
   /* Apply adaptLabel to the forest and set up */
@@ -122,11 +124,37 @@ static PetscErrorCode SetAdaptRefineLabel(DM *preforest, DMLabel *adaptLabel, Pe
   return(0);
 }
 
-static PetscErrorCode SetupRefineFuncs(DM dm, _RefinementFuncs *user)
+static PetscErrorCode CreateRefinementFunctionStructure(RefinementFunctions *RF)
 {
-  user->refineFuncs[0] = RefineCircumference;
-  user->refineFuncs[1] = RefineTopEdge;
-  user->refineFuncs[2] = RefineRightEdge;
+  RF->n = 0;
+  RF->refineFuncs = NULL;
+  RF->ctx = NULL;
+
+  return(0);
+}
+
+static PetscErrorCode DestroyRefinementFunctionStructure(RefinementFunctions *RF)
+{
+  PetscErrorCode ierr;
+
+  RF->n = 0;
+  RF->refineFuncs = NULL;
+  RF->ctx = NULL;
+  //ierr = PetscFree2(RF->refineFuncs, RF->ctx);CHKERRQ(ierr);
+
+  return(0);
+}
+
+static PetscErrorCode AddRefinementFunction(RefinementFunctions *RF, PetscErrorCode (*func)(PetscInt, DM, Vec, PetscInt *, void *), void *ictx)
+{
+  Ctx            *ctx = (Ctx*)ictx;
+  PetscErrorCode ierr;
+
+  ierr = PetscRealloc(RF->n+1, &RF->refineFuncs);CHKERRQ(ierr);
+  ierr = PetscRealloc(RF->n+1, &RF->ctx);CHKERRQ(ierr);
+  RF->refineFuncs[RF->n] = func;
+  RF->ctx[RF->n] = ctx;
+  ++RF->n;
 
   return(0);
 }
@@ -135,25 +163,29 @@ int main(int argc, char **argv)
 {
   DM             dm, dmDist, base, forest;
   PetscInt	 dim = 2, n, nrefine = 4;
-  PetscReal      lower[2] = {0,0}, upper[2] = {10,10};
+  PetscReal      lower[2] = {0,0}, upper[2] = {6,10};
   PetscBool      interpolate = PETSC_TRUE;
   DMLabel        adaptLabel = NULL;
-  Ctx            ctx;
+  Ctx            ctx[3];
   PetscErrorCode ierr;
-   _RefinementFuncs RefinementFuncs;
+  RefinementFunctions RF;
 
   ierr = PetscInitialize(&argc, &argv, NULL,help);if (ierr) return ierr;
   /* Dimension of mesh */
   ierr = PetscOptionsGetInt(NULL,NULL, "-dim", &dim, NULL);CHKERRQ(ierr);
   /* Refinement Level */
   ierr = PetscOptionsGetInt(NULL,NULL, "-nrefine", &nrefine, NULL);CHKERRQ(ierr);
-  /* Radius of circle */
-  ctx.p = 1;
-  ierr = PetscOptionsGetInt(NULL,NULL, "-p", &ctx.p, NULL);CHKERRQ(ierr);
-  /* Calculate center coordinates */
-  /* ctx.xcenter = (upper[0]+lower[0])/2; ctx.ycenter = (upper[1]+lower[1])/2; */
-  ctx.xcenter = 2; ctx.ycenter = 2;
-  ctx.ytop = upper[1]; ctx.xright = upper[0];
+
+  /* Context for RefineCircumference */
+  ctx[0].p = 1;
+  ierr = PetscOptionsGetInt(NULL,NULL, "-p", &ctx[0].p, NULL);CHKERRQ(ierr);
+  ctx[0].xcenter = 2; ctx[0].ycenter = 2;
+
+  /* Context for RefineTopEdge */
+  ctx[1].ytop = upper[1];
+
+  /* Context for RefineRightEdge */
+  ctx[2].xright = upper[0];
 
   /* Create a base DMPlex mesh */
   ierr = DMPlexCreateBoxMesh(PETSC_COMM_WORLD, dim, PETSC_FALSE, NULL, lower, upper, NULL, interpolate, &base);CHKERRQ(ierr);
@@ -172,21 +204,25 @@ int main(int argc, char **argv)
   ierr = DMDestroy(&base);CHKERRQ(ierr);
 
   /* Set Refinement Functions Application Context */
-  RefinementFuncs.n = 3; /* Number of functions */
-  ierr = DMSetApplicationContext(forest, &RefinementFuncs);CHKERRQ(ierr);
-  ierr = PetscMalloc1(RefinementFuncs.n, &RefinementFuncs.refineFuncs);CHKERRQ(ierr);
-  ierr = SetupRefineFuncs(forest, &RefinementFuncs);CHKERRQ(ierr);
+  ierr = DMSetApplicationContext(forest, &RF);CHKERRQ(ierr);
+
+  /* Initialize RF structure and add refinement functions */
+  ierr = CreateRefinementFunctionStructure(&RF);CHKERRQ(ierr);
+  ierr = AddRefinementFunction(&RF, &RefineCircumference, &ctx[0]);CHKERRQ(ierr);
+  ierr = AddRefinementFunction(&RF, &RefineTopEdge, &ctx[1]);CHKERRQ(ierr);
+  ierr = AddRefinementFunction(&RF, &RefineRightEdge, &ctx[2]);CHKERRQ(ierr);
 
   /* Refinement Loop */
   for (n = 0; n < nrefine; ++n)
   {
-    /* Call Refinement Functions */
-    ierr = SetAdaptRefineLabel(&forest, &adaptLabel, RefinementFuncs.refineFuncs, RefinementFuncs.n, &ctx);CHKERRQ(ierr);
+    /* Set refine labels on each cell using info from refinement functions */
+    ierr = SetAdaptRefineLabel(&forest, &adaptLabel, &RF);CHKERRQ(ierr);
   }
 
   /* Convert Forest back to Plex for visualization */
   ierr = DMConvert(forest, DMPLEX, &dm);CHKERRQ(ierr);
   ierr = DMDestroy(&forest);CHKERRQ(ierr);
+  ierr = DestroyRefinementFunctionStructure(&RF);CHKERRQ(ierr);
 
   /* DM View */
   ierr = DMViewFromOptions(dm, NULL, "-dm_view");CHKERRQ(ierr);
