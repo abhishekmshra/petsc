@@ -13,7 +13,7 @@ typedef struct {
 
 struct _refinement_funcs_struct{
   PetscErrorCode (**refineFuncs)(PetscInt, DM, Vec, PetscInt *, void *);
-  Ctx            **ctx;
+  void           **ctx;
   PetscInt       n; /* Number of functions */
 };
 
