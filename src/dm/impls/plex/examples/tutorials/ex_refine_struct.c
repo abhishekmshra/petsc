@@ -8,8 +8,16 @@ static char help[] = "Adaptively refine mesh using mutiple external refinement f
 #include <petscmath.h>
 
 typedef struct {
-  PetscInt       p, xcenter, ycenter, ytop, xright;
-} Ctx;
+  PetscReal      p, xcenter, ycenter;
+} CircumCtx;
+
+typedef struct {
+  PetscReal      ytop;
+} TopEdgeCtx;
+
+typedef struct {
+  PetscReal      xright;
+} RightEdgeCtx;
 
 struct _refinement_funcs_struct{
   PetscErrorCode (**refineFuncs)(PetscInt, DM, Vec, PetscInt *, void *);
@@ -21,7 +29,7 @@ typedef struct _refinement_funcs_struct RefinementFunctions;
 
 static PetscErrorCode RefineTopEdge(PetscInt c, DM cdm, Vec coordinates, PetscInt *label_val, void *ictx)
 {
-  Ctx            *ctx = (Ctx*)ictx;
+  TopEdgeCtx     *ctx = (TopEdgeCtx*)ictx;
   PetscInt       csize;
   PetscScalar    *coords = NULL;
   PetscReal      y3, ytop = ctx->ytop;
@@ -40,7 +48,7 @@ static PetscErrorCode RefineTopEdge(PetscInt c, DM cdm, Vec coordinates, PetscIn
 
 static PetscErrorCode RefineRightEdge(PetscInt c, DM cdm, Vec coordinates, PetscInt *label_val, void *ictx)
 {
-  Ctx            *ctx = (Ctx*)ictx;
+  RightEdgeCtx   *ctx = (RightEdgeCtx*)ictx;
   PetscInt       csize;
   PetscScalar    *coords = NULL;
   PetscReal      x2, xright = ctx->xright;
@@ -59,9 +67,10 @@ static PetscErrorCode RefineRightEdge(PetscInt c, DM cdm, Vec coordinates, Petsc
 
 static PetscErrorCode RefineCircumference(PetscInt c, DM cdm, Vec coordinates, PetscInt *label_val, void *ictx)
 {
-  Ctx            *ctx = (Ctx*)ictx;
-  PetscInt       csize, xcenter = ctx->xcenter, ycenter = ctx->ycenter, p = ctx->p;
+  CircumCtx      *ctx = (CircumCtx*)ictx;
+  PetscInt       csize;
   PetscScalar    *coords = NULL;
+  PetscReal      xcenter = ctx->xcenter, ycenter = ctx->ycenter, p = ctx->p;
   PetscReal      min, x1, x2, x3, x4, y1, y2, y3, y4, diag, S1, S2, S3, S4;
   PetscErrorCode ierr;
 
@@ -140,14 +149,14 @@ static PetscErrorCode DestroyRefinementFunctionStructure(RefinementFunctions *RF
   RF->n = 0;
   RF->refineFuncs = NULL;
   RF->ctx = NULL;
-  //ierr = PetscFree2(RF->refineFuncs, RF->ctx);CHKERRQ(ierr);
+  //ierr = PetscFree(RF->refineFuncs);CHKERRQ(ierr);
+  //ierr = PetscFree(RF->ctx);CHKERRQ(ierr);
 
   return(0);
 }
 
-static PetscErrorCode AddRefinementFunction(RefinementFunctions *RF, PetscErrorCode (*func)(PetscInt, DM, Vec, PetscInt *, void *), void *ictx)
+static PetscErrorCode AddRefinementFunction(RefinementFunctions *RF, PetscErrorCode (*func)(PetscInt, DM, Vec, PetscInt *, void *), void *ctx)
 {
-  Ctx            *ctx = (Ctx*)ictx;
   PetscErrorCode ierr;
 
   ierr = PetscRealloc(RF->n+1, &RF->refineFuncs);CHKERRQ(ierr);
@@ -163,12 +172,15 @@ int main(int argc, char **argv)
 {
   DM             dm, dmDist, base, forest;
   PetscInt	 dim = 2, n, nrefine = 4;
-  PetscReal      lower[2] = {0,0}, upper[2] = {6,10};
+  PetscReal      lower[2] = {0,0}, upper[2] = {7.5,12.5};
   PetscBool      interpolate = PETSC_TRUE;
   DMLabel        adaptLabel = NULL;
-  Ctx            ctx[3];
   PetscErrorCode ierr;
-  RefinementFunctions RF;
+
+  RefinementFunctions   RF;
+  CircumCtx             circum_ctx;
+  TopEdgeCtx            top_ctx;
+  RightEdgeCtx          right_ctx;
 
   ierr = PetscInitialize(&argc, &argv, NULL,help);if (ierr) return ierr;
   /* Dimension of mesh */
@@ -177,15 +189,15 @@ int main(int argc, char **argv)
   ierr = PetscOptionsGetInt(NULL,NULL, "-nrefine", &nrefine, NULL);CHKERRQ(ierr);
 
   /* Context for RefineCircumference */
-  ctx[0].p = 1;
-  ierr = PetscOptionsGetInt(NULL,NULL, "-p", &ctx[0].p, NULL);CHKERRQ(ierr);
-  ctx[0].xcenter = 2; ctx[0].ycenter = 2;
+  circum_ctx.p = 1.5;   /* Radius */
+  circum_ctx.xcenter = 3.5;
+  circum_ctx.ycenter = 3.5;
 
   /* Context for RefineTopEdge */
-  ctx[1].ytop = upper[1];
+  top_ctx.ytop = upper[1];
 
   /* Context for RefineRightEdge */
-  ctx[2].xright = upper[0];
+  right_ctx.xright = upper[0];
 
   /* Create a base DMPlex mesh */
   ierr = DMPlexCreateBoxMesh(PETSC_COMM_WORLD, dim, PETSC_FALSE, NULL, lower, upper, NULL, interpolate, &base);CHKERRQ(ierr);
@@ -208,9 +220,9 @@ int main(int argc, char **argv)
 
   /* Initialize RF structure and add refinement functions */
   ierr = CreateRefinementFunctionStructure(&RF);CHKERRQ(ierr);
-  ierr = AddRefinementFunction(&RF, &RefineCircumference, &ctx[0]);CHKERRQ(ierr);
-  ierr = AddRefinementFunction(&RF, &RefineTopEdge, &ctx[1]);CHKERRQ(ierr);
-  ierr = AddRefinementFunction(&RF, &RefineRightEdge, &ctx[2]);CHKERRQ(ierr);
+  ierr = AddRefinementFunction(&RF, &RefineCircumference, &circum_ctx);CHKERRQ(ierr);
+  ierr = AddRefinementFunction(&RF, &RefineTopEdge, &top_ctx);CHKERRQ(ierr);
+  ierr = AddRefinementFunction(&RF, &RefineRightEdge, &right_ctx);CHKERRQ(ierr);
 
   /* Refinement Loop */
   for (n = 0; n < nrefine; ++n)
