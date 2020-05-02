@@ -193,6 +193,7 @@ int main(int argc, char **argv)
   DM             dm, dmDist, base, forest;
   PetscInt	 dim = 2, inp_dim, n, nrefine = 4;
   PetscBool      interpolate = PETSC_TRUE, flg = PETSC_FALSE;
+  PetscBool      refine_circum, refine_top, refine_right;
   DMLabel        adaptLabel = NULL;
   PetscErrorCode ierr;
 
@@ -229,8 +230,13 @@ int main(int argc, char **argv)
 
   /* Context for RefineCircumference */
   circum_ctx.p = 1;   /* Radius */
+  ierr = PetscOptionsGetReal(NULL,NULL, "-p", &circum_ctx.p, NULL);CHKERRQ(ierr);
+
   circum_ctx.xcenter = 2;
+  ierr = PetscOptionsGetReal(NULL,NULL, "-xc", &circum_ctx.xcenter, NULL);CHKERRQ(ierr);
+
   circum_ctx.ycenter = 2;
+  ierr = PetscOptionsGetReal(NULL,NULL, "-yc", &circum_ctx.ycenter, NULL);CHKERRQ(ierr);
 
   /* Context for RefineTopEdge */
   top_ctx.ytop = upper[1];
@@ -254,14 +260,27 @@ int main(int argc, char **argv)
   ierr = DMSetUp(forest);CHKERRQ(ierr);
   ierr = DMDestroy(&base);CHKERRQ(ierr);
 
+  ierr = PetscOptionsBegin(PETSC_COMM_WORLD, "", "Refinement Options", "DMPLEX");CHKERRQ(ierr);
+
+  ierr = PetscOptionsBool("-refine_circum", "Refine Circumference", "ex_refine_3D.c", refine_circum, &refine_circum, NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-refine_top_edge", "Refine Top Edge", "ex_refine_3D.c", refine_top, &refine_top, NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-refine_right_edge", "Refine Right Edge", "ex_refine_3D.c", refine_right, &refine_right, NULL);CHKERRQ(ierr);
+
+  ierr = PetscOptionsEnd();CHKERRQ(ierr);
+
   /* Set Refinement Functions Application Context */
   ierr = DMSetApplicationContext(forest, &RF);CHKERRQ(ierr);
 
   /* Initialize RF structure and add refinement functions */
   ierr = CreateRefinementFunctionStructure(&RF);CHKERRQ(ierr);
-  ierr = AddRefinementFunction(&RF, &RefineCircumference, &circum_ctx);CHKERRQ(ierr);
-  ierr = AddRefinementFunction(&RF, &RefineTopEdge, &top_ctx);CHKERRQ(ierr);
-  ierr = AddRefinementFunction(&RF, &RefineRightEdge, &right_ctx);CHKERRQ(ierr);
+  if (refine_circum) ierr = AddRefinementFunction(&RF, &RefineCircumference, &circum_ctx);CHKERRQ(ierr);
+  if (refine_top) ierr = AddRefinementFunction(&RF, &RefineTopEdge, &top_ctx);CHKERRQ(ierr);
+  if (refine_right) ierr = AddRefinementFunction(&RF, &RefineRightEdge, &right_ctx);CHKERRQ(ierr);
+
+  if (!refine_circum && !refine_top && !refine_right)
+  {
+    SETERRQ(PETSC_COMM_SELF,PETSC_ERR_USER,"User must specify at least one refinement function");
+  }
 
   /* Refinement Loop */
   for (n = 0; n < nrefine; ++n)
