@@ -191,8 +191,8 @@ static PetscErrorCode AddRefinementFunction(RefinementFunctions *RF, PetscErrorC
 int main(int argc, char **argv)
 {
   DM             dm, dmDist, base, forest;
-  PetscInt	 dim = 2, n, nrefine = 4;
-  PetscBool      interpolate = PETSC_TRUE;
+  PetscInt	 dim = 2, inp_dim, n, nrefine = 4;
+  PetscBool      interpolate = PETSC_TRUE, flg = PETSC_FALSE;
   DMLabel        adaptLabel = NULL;
   PetscErrorCode ierr;
 
@@ -204,21 +204,28 @@ int main(int argc, char **argv)
   ierr = PetscInitialize(&argc, &argv, NULL,help);if (ierr) return ierr;
   /* Dimension of mesh */
   ierr = PetscOptionsGetInt(NULL,NULL, "-dim", &dim, NULL);CHKERRQ(ierr);
-  /* Refinement Level */
-  ierr = PetscOptionsGetInt(NULL,NULL, "-nrefine", &nrefine, NULL);CHKERRQ(ierr);
+
+  /* Lower and upper coordinates of mesh */
 
   PetscReal      lower[dim], upper[dim];
 
-  lower[0] = 0;
-  lower[1] = 0;
-  upper[0] = 4;
-  upper[1] = 6;
+  lower[0] = 0; lower[1] = 0;
+  upper[0] = 4; upper[1] = 4;
 
   if (dim == 3)
   {
-    lower[2] = 0;
-    upper[2] = 8;
+    lower[2] = 0; upper[2] = 4;
   }
+
+  inp_dim = 10;
+  ierr = PetscOptionsGetRealArray(NULL,NULL, "-lower", lower, &inp_dim, &flg);CHKERRQ(ierr);
+  if (flg) if (dim != inp_dim) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_USER,"User must supply equal number of dimensions for -dim and -lower");
+  inp_dim = 10;
+  ierr = PetscOptionsGetRealArray(NULL,NULL, "-upper", upper, &inp_dim, &flg);CHKERRQ(ierr);
+  if (flg) if (dim != inp_dim) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_USER,"User must supply equal number of dimensions for -dim and -upper");
+
+   /* Refinement Level */
+  ierr = PetscOptionsGetInt(NULL,NULL, "-nrefine", &nrefine, NULL);CHKERRQ(ierr);
 
   /* Context for RefineCircumference */
   circum_ctx.p = 1;   /* Radius */
