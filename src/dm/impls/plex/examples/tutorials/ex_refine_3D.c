@@ -8,7 +8,7 @@ static char help[] = "Adaptively refine mesh using mutiple external refinement f
 #include <petscmath.h>
 
 typedef struct {
-  PetscReal      p, xcenter, ycenter;
+  PetscReal      p, xcenter, ycenter, zcenter;
 } CircumCtx;
 
 typedef struct {
@@ -82,7 +82,7 @@ static PetscErrorCode RefineCircumference(PetscInt c, DM cdm, Vec coordinates, P
   CircumCtx      *ctx = (CircumCtx*)ictx;
   PetscInt       csize, dim;
   PetscScalar    *coords = NULL;
-  PetscReal      xcenter = ctx->xcenter, ycenter = ctx->ycenter, p = ctx->p;
+  PetscReal      xcenter = ctx->xcenter, ycenter = ctx->ycenter, zcenter = ctx->zcenter, p = ctx->p;
   PetscReal      min, x1, x2, x3, x4, y1, y2, y3, y4, z1, z2, z3, z4,diag, S1, S2, S3, S4;
   PetscErrorCode ierr;
 
@@ -94,19 +94,26 @@ static PetscErrorCode RefineCircumference(PetscInt c, DM cdm, Vec coordinates, P
   y1 = PetscRealPart(coords[1]); y2 = PetscRealPart(coords[3]);
   y3 = PetscRealPart(coords[5]); y4 = PetscRealPart(coords[7]);
 
-  if (dim == 3)
-  {
-    x1 = PetscRealPart(coords[0]); x2 = PetscRealPart(coords[3]); x3 = PetscRealPart(coords[6]); x4 = PetscRealPart(coords[9]);
-    y1 = PetscRealPart(coords[1]); y2 = PetscRealPart(coords[4]); y3 = PetscRealPart(coords[7]); y4 = PetscRealPart(coords[10]);
-    z1 = PetscRealPart(coords[2]); z2 = PetscRealPart(coords[5]); z3 = PetscRealPart(coords[8]); z4 = PetscRealPart(coords[11]);
-  }
-
   diag = PetscSqrtReal(PetscSqr(x3-x1) + PetscSqr(y3-y1));
   /* SDF at each cell vertex */
   S1 = PetscAbsReal(PetscSqrtReal(PetscSqr(xcenter-x1) + PetscSqr(ycenter-y1)) - p);
   S2 = PetscAbsReal(PetscSqrtReal(PetscSqr(xcenter-x2) + PetscSqr(ycenter-y2)) - p);
   S3 = PetscAbsReal(PetscSqrtReal(PetscSqr(xcenter-x3) + PetscSqr(ycenter-y3)) - p);
   S4 = PetscAbsReal(PetscSqrtReal(PetscSqr(xcenter-x4) + PetscSqr(ycenter-y4)) - p);
+
+  if (dim == 3)
+  {
+    x1 = PetscRealPart(coords[0]); x2 = PetscRealPart(coords[3]); x3 = PetscRealPart(coords[6]); x4 = PetscRealPart(coords[9]);
+    y1 = PetscRealPart(coords[1]); y2 = PetscRealPart(coords[4]); y3 = PetscRealPart(coords[7]); y4 = PetscRealPart(coords[10]);
+    z1 = PetscRealPart(coords[2]); z2 = PetscRealPart(coords[5]); z3 = PetscRealPart(coords[8]); z4 = PetscRealPart(coords[11]);
+
+    diag = PetscSqrtReal(PetscSqr(x3-x1) + PetscSqr(y3-y1) + PetscSqr(z3-z1));
+
+    S1 = PetscAbsReal(PetscSqrtReal(PetscSqr(xcenter-x1) + PetscSqr(ycenter-y1) + PetscSqr(zcenter-z1)) - p);
+    S2 = PetscAbsReal(PetscSqrtReal(PetscSqr(xcenter-x2) + PetscSqr(ycenter-y2) + PetscSqr(zcenter-z2)) - p);
+    S3 = PetscAbsReal(PetscSqrtReal(PetscSqr(xcenter-x3) + PetscSqr(ycenter-y3) + PetscSqr(zcenter-z3)) - p);
+    S4 = PetscAbsReal(PetscSqrtReal(PetscSqr(xcenter-x4) + PetscSqr(ycenter-y4) + PetscSqr(zcenter-z4)) - p);
+  }
 
   min = PetscMin(PetscMin(S1, S2), PetscMin(S3, S4));
 
@@ -191,7 +198,7 @@ static PetscErrorCode AddRefinementFunction(RefinementFunctions *RF, PetscErrorC
 int main(int argc, char **argv)
 {
   DM             dm, dmDist, base, forest;
-  PetscInt	 dim = 2, inp_dim, n, nrefine = 4;
+  PetscInt	 dim = 2, max_dim, n, nrefine = 4;
   PetscBool      interpolate = PETSC_TRUE, flg = PETSC_FALSE;
   PetscBool      refine_circum, refine_top, refine_right;
   DMLabel        adaptLabel = NULL;
@@ -213,17 +220,12 @@ int main(int argc, char **argv)
   lower[0] = 0; lower[1] = 0;
   upper[0] = 4; upper[1] = 4;
 
-  if (dim == 3)
-  {
-    lower[2] = 0; upper[2] = 4;
-  }
-
-  inp_dim = 10;
-  ierr = PetscOptionsGetRealArray(NULL,NULL, "-lower", lower, &inp_dim, &flg);CHKERRQ(ierr);
-  if (flg) if (dim != inp_dim) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_USER,"User must supply equal number of dimensions for -dim and -lower");
-  inp_dim = 10;
-  ierr = PetscOptionsGetRealArray(NULL,NULL, "-upper", upper, &inp_dim, &flg);CHKERRQ(ierr);
-  if (flg) if (dim != inp_dim) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_USER,"User must supply equal number of dimensions for -dim and -upper");
+  max_dim = 10;
+  ierr = PetscOptionsGetRealArray(NULL,NULL, "-lower", lower, &max_dim, &flg);CHKERRQ(ierr);
+  if (flg) if (dim != max_dim) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_USER,"User must supply equal number of dimensions for -dim and -lower");
+  max_dim = 10;
+  ierr = PetscOptionsGetRealArray(NULL,NULL, "-upper", upper, &max_dim, &flg);CHKERRQ(ierr);
+  if (flg) if (dim != max_dim) SETERRQ(PETSC_COMM_SELF,PETSC_ERR_USER,"User must supply equal number of dimensions for -dim and -upper");
 
    /* Refinement Level */
   ierr = PetscOptionsGetInt(NULL,NULL, "-nrefine", &nrefine, NULL);CHKERRQ(ierr);
@@ -237,6 +239,14 @@ int main(int argc, char **argv)
 
   circum_ctx.ycenter = 2;
   ierr = PetscOptionsGetReal(NULL,NULL, "-yc", &circum_ctx.ycenter, NULL);CHKERRQ(ierr);
+
+  if (dim == 3)
+  {
+    lower[2] = 0; upper[2] = 4;
+
+    circum_ctx.zcenter = 2;
+    ierr = PetscOptionsGetReal(NULL,NULL, "-zc", &circum_ctx.zcenter, NULL);CHKERRQ(ierr);
+  }
 
   /* Context for RefineTopEdge */
   top_ctx.ytop = upper[1];
