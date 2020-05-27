@@ -23,7 +23,6 @@ class Configure(config.package.GNUPackage):
     #self.complex           = 0
     self.hastests          = 1
     self.hastestsdatafiles = 1
-    self.installwithbatch  = 0
 
   def setupDependencies(self, framework):
     config.package.GNUPackage.setupDependencies(self, framework)
@@ -34,6 +33,8 @@ class Configure(config.package.GNUPackage):
     self.mathlib    = framework.require('config.packages.mathlib',self)
     self.scalar     = framework.require('PETSc.options.scalarTypes',self)
     self.deps       = [self.mpi,self.blasLapack,self.cxxlibs,self.mathlib]
+    if self.setCompilers.isCrayKNL(None,self.log):
+      self.installwithbatch  = 0
 
   def formGNUConfigureArgs(self):
     self.packageDir = os.path.join(self.packageDir,'src')
@@ -54,7 +55,9 @@ class Configure(config.package.GNUPackage):
     libs = []
     for l in self.mpi.lib:
       ll = os.path.basename(l)
-      libs.append(ll[3:-2])
+      if ll.endswith('.a'): libs.append(ll[3:-2])
+      if ll.endswith('.so'): libs.append(ll[3:-3])
+      if ll.endswith('.dylib'): libs.append(ll[3:-6])
     libs = ' '.join(libs)
     args.append('--with-MPI-libs="'+libs+'"')
 
@@ -110,8 +113,9 @@ class Configure(config.package.GNUPackage):
 
   def configureLibrary(self):
     config.package.Package.configureLibrary(self)
-    oldFlags = self.compilers.CPPFLAGS
-    self.compilers.CPPFLAGS += ' '+self.headers.toString(self.include)
+    flagsArg = self.getPreprocessorFlagsArg()
+    oldFlags = getattr(self.compilers, flagsArg)
+    setattr(self.compilers, flagsArg, oldFlags+' '+self.headers.toString(self.include))
     # check integers
     if self.defaultIndexSize == 64:
       code = '#if !defined(HYPRE_BIGINT) && !defined(HYPRE_MIXEDINT)\n#error HYPRE_BIGINT or HYPRE_MIXEDINT not defined!\n#endif'
@@ -121,5 +125,5 @@ class Configure(config.package.GNUPackage):
       msg  = 'Hypre with --enable-bigint/--enable-mixedint appears to be specified for a default 32-bit-indices build of PETSc.\n'
     if not self.checkCompile('#include "HYPRE_config.h"',code):
       raise RuntimeError('Hypre specified is incompatible!\n'+msg+'Suggest using --download-hypre for a compatible hypre')
-    self.compilers.CPPFLAGS = oldFlags
+    setattr(self.compilers, flagsArg,oldFlags)
     return

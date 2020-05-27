@@ -24,7 +24,7 @@ static PetscErrorCode SNESTR_KSPConverged_Private(KSP ksp,PetscInt n,PetscReal r
     ierr = PetscInfo2(snes,"Default or user provided convergence test KSP iterations=%D, rnorm=%g\n",n,(double)rnorm);CHKERRQ(ierr);
   }
   /* Determine norm of solution */
-  ierr = KSPBuildSolution(ksp,0,&x);CHKERRQ(ierr);
+  ierr = KSPBuildSolution(ksp,NULL,&x);CHKERRQ(ierr);
   ierr = VecNorm(x,NORM_2,&nrm);CHKERRQ(ierr);
   if (nrm >= neP->delta) {
     ierr    = PetscInfo2(snes,"Ending linear iteration early, delta=%g, length=%g\n",(double)neP->delta,(double)nrm);CHKERRQ(ierr);
@@ -264,7 +264,8 @@ static PetscErrorCode SNESSolve_NEWTONTR(SNES snes)
   SNESConvergedReason      reason = SNES_CONVERGED_ITERATING;
   PetscBool                breakout = PETSC_FALSE;
   SNES_TR_KSPConverged_Ctx *ctx;
-  PetscErrorCode           (*convtest)(KSP,PetscInt,PetscReal,KSPConvergedReason*,void*);
+  PetscErrorCode           (*convtest)(KSP,PetscInt,PetscReal,KSPConvergedReason*,void*),(*convdestroy)(void*);
+  void                     *convctx;
 
   PetscFunctionBegin;
   if (snes->xl || snes->xu || snes->ops->computevariablebounds) SETERRQ1(PetscObjectComm((PetscObject)snes),PETSC_ERR_ARG_WRONGSTATE, "SNES solver %s does not support bounds", ((PetscObject)snes)->type_name);
@@ -283,7 +284,7 @@ static PetscErrorCode SNESSolve_NEWTONTR(SNES snes)
 
   /* Set the linear stopping criteria to use the More' trick. */
   ierr = SNESGetKSP(snes,&ksp);CHKERRQ(ierr);
-  ierr = KSPGetConvergenceTest(ksp,&convtest,NULL,NULL);CHKERRQ(ierr);
+  ierr = KSPGetConvergenceTest(ksp,&convtest,&convctx,&convdestroy);CHKERRQ(ierr);
   if (convtest != SNESTR_KSPConverged_Private) {
     ierr                  = PetscNew(&ctx);CHKERRQ(ierr);
     ctx->snes             = snes;
@@ -414,6 +415,11 @@ static PetscErrorCode SNESSolve_NEWTONTR(SNES snes)
   ierr         = PetscObjectSAWsTakeAccess((PetscObject)snes);CHKERRQ(ierr);
   snes->reason = reason;
   ierr         = PetscObjectSAWsGrantAccess((PetscObject)snes);CHKERRQ(ierr);
+  if (convtest != SNESTR_KSPConverged_Private) {
+    ierr       = KSPGetAndClearConvergenceTest(ksp,&ctx->convtest,&ctx->convctx,&ctx->convdestroy);CHKERRQ(ierr);
+    ierr       = PetscFree(ctx);CHKERRQ(ierr);
+    ierr       = KSPSetConvergenceTest(ksp,convtest,convctx,convdestroy);CHKERRQ(ierr);
+  }
   PetscFunctionReturn(0);
 }
 /*------------------------------------------------------------*/

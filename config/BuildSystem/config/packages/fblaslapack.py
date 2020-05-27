@@ -3,8 +3,9 @@ import config.package
 class Configure(config.package.Package):
   def __init__(self, framework):
     config.package.Package.__init__(self, framework)
-    self.gitcommit              = 'origin/barry/2019-08-22/fix-syntax-for-nag'
+    self.gitcommit              = 'v3.4.2-p3'
     self.download               = ['git://https://bitbucket.org/petsc/pkg-fblaslapack','https://bitbucket.org/petsc/pkg-fblaslapack/get/'+self.gitcommit+'.tar.gz']
+    self.downloaddirnames       = ['petsc-pkg-fblaslapack']
     self.precisions             = ['single','double']
     self.downloadonWindows      = 1
     self.skippackagewithoptions = 1
@@ -57,6 +58,8 @@ class Configure(config.package.Package):
         line = 'FOPTFLAGS  = '+self.setCompilers.getCompilerFlags().replace('-Mfree','')
         if config.setCompilers.Configure.isNAG(self.setCompilers.getLinker(), self.log):
           line = line + ' -dusty -dcfuns'
+        elif config.setCompilers.Configure.isGfortran100plus(self.setCompilers.getCompiler(), self.log):
+          line = line + ' -fallow-argument-mismatch'
         line = line + '\n'
         noopt = self.checkNoOptFlag()
         self.setCompilers.popLanguage()
@@ -65,6 +68,8 @@ class Configure(config.package.Package):
         line = 'FNOOPT = '+noopt+' '+self.getSharedFlag(self.setCompilers.getCompilerFlags())+' '+self.getPointerSizeFlag(self.setCompilers.getCompilerFlags())+' '+self.getWindowsNonOptFlags(self.setCompilers.getCompilerFlags())
         if config.setCompilers.Configure.isNAG(self.setCompilers.getLinker(), self.log):
           line = line + ' -dusty -dcfuns'
+        elif config.setCompilers.Configure.isGfortran100plus(self.setCompilers.getCompiler(), self.log):
+          line = line + ' -fallow-argument-mismatch'
         line = line + '\n'
         self.setCompilers.popLanguage()
       if line.startswith('AR  '):

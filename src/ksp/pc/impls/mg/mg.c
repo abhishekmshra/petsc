@@ -429,7 +429,7 @@ PetscErrorCode PCSetFromOptions_MG(PetscOptionItems *PetscOptionsObject,PC pc)
     ierr = PCMGSetGalerkin(pc,gtype);CHKERRQ(ierr);
   }
   flg = PETSC_FALSE;
-  ierr = PetscOptionsBool("-pc_mg_distinct_smoothup","Create seperate smoothup KSP and append the prefix _up","PCMGSetDistinctSmoothUp",PETSC_FALSE,&flg,NULL);CHKERRQ(ierr);
+  ierr = PetscOptionsBool("-pc_mg_distinct_smoothup","Create separate smoothup KSP and append the prefix _up","PCMGSetDistinctSmoothUp",PETSC_FALSE,&flg,NULL);CHKERRQ(ierr);
   if (flg) {
     ierr = PCMGSetDistinctSmoothUp(pc);CHKERRQ(ierr);
   }
@@ -487,9 +487,9 @@ PetscErrorCode PCSetFromOptions_MG(PetscOptionItems *PetscOptionsObject,PC pc)
   PetscFunctionReturn(0);
 }
 
-const char *const PCMGTypes[] = {"MULTIPLICATIVE","ADDITIVE","FULL","KASKADE","PCMGType","PC_MG",0};
-const char *const PCMGCycleTypes[] = {"invalid","v","w","PCMGCycleType","PC_MG_CYCLE",0};
-const char *const PCMGGalerkinTypes[] = {"both","pmat","mat","none","external","PCMGGalerkinType","PC_MG_GALERKIN",0};
+const char *const PCMGTypes[] = {"MULTIPLICATIVE","ADDITIVE","FULL","KASKADE","PCMGType","PC_MG",NULL};
+const char *const PCMGCycleTypes[] = {"invalid","v","w","PCMGCycleType","PC_MG_CYCLE",NULL};
+const char *const PCMGGalerkinTypes[] = {"both","pmat","mat","none","external","PCMGGalerkinType","PC_MG_GALERKIN",NULL};
 
 #include <petscdraw.h>
 PetscErrorCode PCView_MG(PC pc,PetscViewer viewer)
@@ -594,7 +594,7 @@ PetscErrorCode PCSetUp_MG(PC pc)
   Mat            dA,dB;
   Vec            tvec;
   DM             *dms;
-  PetscViewer    viewer = 0;
+  PetscViewer    viewer = NULL;
   PetscBool      dAeqdB = PETSC_FALSE, needRestricts = PETSC_FALSE;
 
   PetscFunctionBegin;
@@ -768,34 +768,17 @@ PetscErrorCode PCSetUp_MG(PC pc)
       dB = B;
     }
   }
-  if (needRestricts && pc->dm && pc->dm->x) {
-    /* need to restrict Jacobian location to coarser meshes for evaluation */
-    for (i=n-2; i>-1; i--) {
-      Mat R;
-      Vec rscale;
-      if (!mglevels[i]->smoothd->dm->x) {
-        Vec *vecs;
-        ierr = KSPCreateVecs(mglevels[i]->smoothd,1,&vecs,0,NULL);CHKERRQ(ierr);
-        mglevels[i]->smoothd->dm->x = vecs[0];
-        ierr = PetscFree(vecs);CHKERRQ(ierr);
-      }
-      ierr = PCMGGetRestriction(pc,i+1,&R);CHKERRQ(ierr);
-      ierr = PCMGGetRScale(pc,i+1,&rscale);CHKERRQ(ierr);
-      ierr = MatRestrict(R,mglevels[i+1]->smoothd->dm->x,mglevels[i]->smoothd->dm->x);CHKERRQ(ierr);
-      ierr = VecPointwiseMult(mglevels[i]->smoothd->dm->x,mglevels[i]->smoothd->dm->x,rscale);CHKERRQ(ierr);
-    }
-  }
   if (needRestricts && pc->dm) {
     for (i=n-2; i>=0; i--) {
       DM  dmfine,dmcoarse;
       Mat Restrict,Inject;
       Vec rscale;
-      ierr   = KSPGetDM(mglevels[i+1]->smoothd,&dmfine);CHKERRQ(ierr);
-      ierr   = KSPGetDM(mglevels[i]->smoothd,&dmcoarse);CHKERRQ(ierr);
-      ierr   = PCMGGetRestriction(pc,i+1,&Restrict);CHKERRQ(ierr);
-      ierr   = PCMGGetRScale(pc,i+1,&rscale);CHKERRQ(ierr);
-      ierr   = PCMGGetInjection(pc,i+1,&Inject);CHKERRQ(ierr);
-      ierr   = DMRestrict(dmfine,Restrict,rscale,Inject,dmcoarse);CHKERRQ(ierr);
+      ierr = KSPGetDM(mglevels[i+1]->smoothd,&dmfine);CHKERRQ(ierr);
+      ierr = KSPGetDM(mglevels[i]->smoothd,&dmcoarse);CHKERRQ(ierr);
+      ierr = PCMGGetRestriction(pc,i+1,&Restrict);CHKERRQ(ierr);
+      ierr = PCMGGetRScale(pc,i+1,&rscale);CHKERRQ(ierr);
+      ierr = PCMGGetInjection(pc,i+1,&Inject);CHKERRQ(ierr);
+      ierr = DMRestrict(dmfine,Restrict,rscale,Inject,dmcoarse);CHKERRQ(ierr);
     }
   }
 
@@ -1160,7 +1143,7 @@ PetscErrorCode  PCMGGetGalerkin(PC pc,PCMGGalerkinType  *galerkin)
 +  mg - the multigrid context
 -  n - the number of smoothing steps
 
-   Options Database Key: 
+   Options Database Key:
 .  -mg_levels_ksp_max_it <n> - Sets number of pre and post-smoothing steps
 
    Level: advanced
@@ -1194,7 +1177,7 @@ PetscErrorCode  PCMGSetNumberSmooth(PC pc,PetscInt n)
 }
 
 /*@
-   PCMGSetDistinctSmoothUp - sets the up (post) smoother to be a seperate KSP from the down (pre) smoother on all levels
+   PCMGSetDistinctSmoothUp - sets the up (post) smoother to be a separate KSP from the down (pre) smoother on all levels
        and adds the suffix _up to the options name
 
    Logically Collective on PC

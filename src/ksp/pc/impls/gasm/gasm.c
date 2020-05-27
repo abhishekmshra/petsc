@@ -319,7 +319,6 @@ static PetscErrorCode PCSetUp_GASM(PC pc)
 {
   PC_GASM        *osm = (PC_GASM*)pc->data;
   PetscErrorCode ierr;
-  PetscBool      symset,flg;
   PetscInt       i,nInnerIndices,nTotalInnerIndices;
   PetscMPIInt    rank, size;
   MatReuse       scall = MAT_REUSE_MATRIX;
@@ -349,11 +348,6 @@ static PetscErrorCode PCSetUp_GASM(PC pc)
     if(osm->hierarchicalpartitioning){
       ierr = PCGASMSetHierarchicalPartitioning(pc);CHKERRQ(ierr);
     }
-    if (!osm->type_set) {
-      ierr = MatIsSymmetricKnown(pc->pmat,&symset,&flg);CHKERRQ(ierr);
-      if (symset && flg) osm->type = PC_GASM_BASIC;
-    }
-
     if (osm->n == PETSC_DETERMINE) {
       if (osm->N != PETSC_DETERMINE) {
 	   /* No local subdomains given, but the desired number of total subdomains is known, so construct them accordingly. */
@@ -622,7 +616,7 @@ static PetscErrorCode PCSetUp_GASM(PC pc)
   if(osm->pcmat){
     ierr = MatDestroy(&pc->pmat);CHKERRQ(ierr);
     pc->pmat   = osm->pcmat;
-    osm->pcmat = 0;
+    osm->pcmat = NULL;
   }
   PetscFunctionReturn(0);
 }
@@ -842,15 +836,10 @@ static PetscErrorCode PCSetFromOptions_GASM(PetscOptionItems *PetscOptionsObject
   PC_GASM        *osm = (PC_GASM*)pc->data;
   PetscErrorCode ierr;
   PetscInt       blocks,ovl;
-  PetscBool      symset,flg;
+  PetscBool      flg;
   PCGASMType     gasmtype;
 
   PetscFunctionBegin;
-  /* set the type to symmetric if matrix is symmetric */
-  if (!osm->type_set && pc->pmat) {
-    ierr = MatIsSymmetricKnown(pc->pmat,&symset,&flg);CHKERRQ(ierr);
-    if (symset && flg) osm->type = PC_GASM_BASIC;
-  }
   ierr = PetscOptionsHead(PetscOptionsObject,"Generalized additive Schwarz options");CHKERRQ(ierr);
   ierr = PetscOptionsBool("-pc_gasm_use_dm_subdomains","If subdomains aren't set, use DMCreateDomainDecomposition() to define subdomains.","PCGASMSetUseDMSubdomains",osm->dm_subdomains,&osm->dm_subdomains,&flg);CHKERRQ(ierr);
   ierr = PetscOptionsInt("-pc_gasm_total_subdomains","Total number of subdomains across communicator","PCGASMSetTotalSubdomains",osm->N,&blocks,&flg);CHKERRQ(ierr);
@@ -950,8 +939,7 @@ static PetscErrorCode  PCGASMSetSubdomains_GASM(PC pc,PetscInt n,IS iis[],IS ois
       /* if user does not provide outer indices, we will create the corresponding outer indices using  osm->overlap =1 in PCSetUp_GASM */
     }
   }
-#if defined(PETSC_USE_DEBUG)
-  {
+  if (PetscDefined(USE_DEBUG)) {
     PetscInt        j,rstart,rend,*covered,lsize;
     const PetscInt  *indices;
     /* check if the inner indices cover and only cover the local portion of the preconditioning matrix */
@@ -974,7 +962,6 @@ static PetscErrorCode  PCGASMSetSubdomains_GASM(PC pc,PetscInt n,IS iis[],IS ois
     }
     ierr = PetscFree(covered);CHKERRQ(ierr);
   }
-#endif
   if (iis)  osm->user_subdomains = PETSC_TRUE;
   PetscFunctionReturn(0);
 }
@@ -1020,7 +1007,7 @@ static PetscErrorCode  PCGASMGetSubKSP_GASM(PC pc,PetscInt *n,PetscInt *first,KS
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
-  if (osm->n < 1) SETERRQ(PetscObjectComm((PetscObject)pc),PETSC_ERR_ORDER,"Need to call PCSetUP() on PC (or KSPSetUp() on the outer KSP object) before calling here");
+  if (osm->n < 1) SETERRQ(PetscObjectComm((PetscObject)pc),PETSC_ERR_ORDER,"Need to call PCSetUp() on PC (or KSPSetUp() on the outer KSP object) before calling here");
 
   if (n) *n = osm->n;
   if (first) {
@@ -1265,7 +1252,7 @@ PetscErrorCode  PCGASMGetSubKSP(PC pc,PetscInt *n_local,PetscInt *first_local,KS
 
 .seealso:  PCCreate(), PCSetType(), PCType (for list of available types), PC,
            PCBJACOBI,  PCGASMGetSubKSP(), PCGASMSetSubdomains(),
-           PCSetModifySubmatrices(), PCGASMSetOverlap(), PCGASMSetType()
+           PCSetModifySubMatrices(), PCGASMSetOverlap(), PCGASMSetType()
 
 M*/
 
@@ -1281,22 +1268,22 @@ PETSC_EXTERN PetscErrorCode PCCreate_GASM(PC pc)
   osm->n                        = PETSC_DECIDE;
   osm->nmax                     = PETSC_DETERMINE;
   osm->overlap                  = 0;
-  osm->ksp                      = 0;
-  osm->gorestriction            = 0;
-  osm->girestriction            = 0;
-  osm->pctoouter                = 0;
-  osm->gx                       = 0;
-  osm->gy                       = 0;
-  osm->x                        = 0;
-  osm->y                        = 0;
-  osm->pcx                      = 0;
-  osm->pcy                      = 0;
-  osm->permutationIS            = 0;
-  osm->permutationP             = 0;
-  osm->pcmat                    = 0;
-  osm->ois                      = 0;
-  osm->iis                      = 0;
-  osm->pmat                     = 0;
+  osm->ksp                      = NULL;
+  osm->gorestriction            = NULL;
+  osm->girestriction            = NULL;
+  osm->pctoouter                = NULL;
+  osm->gx                       = NULL;
+  osm->gy                       = NULL;
+  osm->x                        = NULL;
+  osm->y                        = NULL;
+  osm->pcx                      = NULL;
+  osm->pcy                      = NULL;
+  osm->permutationIS            = NULL;
+  osm->permutationP             = NULL;
+  osm->pcmat                    = NULL;
+  osm->ois                      = NULL;
+  osm->iis                      = NULL;
+  osm->pmat                     = NULL;
   osm->type                     = PC_GASM_RESTRICT;
   osm->same_subdomain_solvers   = PETSC_TRUE;
   osm->sort_indices             = PETSC_TRUE;
@@ -1312,7 +1299,7 @@ PETSC_EXTERN PetscErrorCode PCCreate_GASM(PC pc)
   pc->ops->setfromoptions  = PCSetFromOptions_GASM;
   pc->ops->setuponblocks   = PCSetUpOnBlocks_GASM;
   pc->ops->view            = PCView_GASM;
-  pc->ops->applyrichardson = 0;
+  pc->ops->applyrichardson = NULL;
 
   ierr = PetscObjectComposeFunction((PetscObject)pc,"PCGASMSetSubdomains_C",PCGASMSetSubdomains_GASM);CHKERRQ(ierr);
   ierr = PetscObjectComposeFunction((PetscObject)pc,"PCGASMSetOverlap_C",PCGASMSetOverlap_GASM);CHKERRQ(ierr);
@@ -1370,7 +1357,7 @@ PetscErrorCode  PCGASMCreateLocalSubdomains(Mat A, PetscInt nloc, IS *iis[])
            MatConvert(Ad,MATMPIADJ,MAT_INITIAL_MATRIX,&adj) will
            remove the block-aij structure and we cannot expect
            MatPartitioning to split vertices as we need */
-        PetscInt       i,j,len,nnz,cnt,*iia=0,*jja=0;
+        PetscInt       i,j,len,nnz,cnt,*iia=NULL,*jja=NULL;
         const PetscInt *row;
         nnz = 0;
         for (i=0; i<na; i++) { /* count number of nonzeros */
@@ -1645,7 +1632,7 @@ PetscErrorCode  PCGASMCreateSubdomains2D(PC pc,PetscInt M,PetscInt N,PetscInt Md
   PetscInt       k,kk;
   PetscMPIInt    color;
   MPI_Comm       comm, subcomm;
-  IS             **xis = 0, **is = ois, **is_local = iis;
+  IS             **xis = NULL, **is = ois, **is_local = iis;
 
   PetscFunctionBegin;
   ierr = PetscObjectGetComm((PetscObject)pc, &comm);CHKERRQ(ierr);
@@ -1866,7 +1853,7 @@ PetscErrorCode  PCGASMGetSubmatrices(PC pc,PetscInt *n,Mat *mat[])
   PetscValidHeaderSpecific(pc,PC_CLASSID,1);
   PetscValidIntPointer(n,2);
   if (mat) PetscValidPointer(mat,3);
-  if (!pc->setupcalled) SETERRQ(PetscObjectComm((PetscObject)pc),PETSC_ERR_ARG_WRONGSTATE,"Must call after KSPSetUP() or PCSetUp().");
+  if (!pc->setupcalled) SETERRQ(PetscObjectComm((PetscObject)pc),PETSC_ERR_ARG_WRONGSTATE,"Must call after KSPSetUp() or PCSetUp().");
   ierr = PetscObjectTypeCompare((PetscObject)pc,PCGASM,&match);CHKERRQ(ierr);
   if (!match) SETERRQ2(PetscObjectComm((PetscObject)pc), PETSC_ERR_ARG_WRONG, "Expected %s, got %s instead", PCGASM, ((PetscObject)pc)->type_name);
   osm = (PC_GASM*)pc->data;

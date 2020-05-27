@@ -3,8 +3,8 @@ import config.package
 class Configure(config.package.Package):
   def __init__(self, framework):
     config.package.Package.__init__(self, framework)
-    self.gitcommit              = '5a5eed5' #master oct-21-2019
-    self.download               = ['git://https://bitbucket.com/slepc/slepc.git','https://bitbucket.org/slepc/slepc/get/'+self.gitcommit+'.tar.gz']
+    self.gitcommit              = 'c7de62a5' # master apr-01-2020
+    self.download               = ['git://https://gitlab.com/slepc/slepc.git','https://gitlab.com/slepc/slepc/-/archive/'+self.gitcommit+'/slepc-'+self.gitcommit+'.tar.gz']
     self.functions              = []
     self.includes               = []
     self.skippackagewithoptions = 1
@@ -55,7 +55,7 @@ class Configure(config.package.Package):
                        ['@echo "*** Building slepc ***"',\
                           '@${RM} -f ${PETSC_ARCH}/lib/petsc/conf/slepc.errorflg',\
                           '@(cd '+self.packageDir+' && \\\n\
-           '+carg+'./configure --prefix='+prefix+' && \\\n\
+           '+carg+'./configure --with-clean --prefix='+prefix+' && \\\n\
            '+barg+'${OMAKE} '+barg+') > ${PETSC_ARCH}/lib/petsc/conf/slepc.log 2>&1 || \\\n\
              (echo "**************************ERROR*************************************" && \\\n\
              echo "Error building slepc. Check ${PETSC_ARCH}/lib/petsc/conf/slepc.log" && \\\n\

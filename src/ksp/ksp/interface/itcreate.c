@@ -13,7 +13,7 @@ PetscLogEvent KSP_GMRESOrthogonalization, KSP_SetUp, KSP_Solve, KSP_SolveTranspo
 /*
    Contains the list of registered KSP routines
 */
-PetscFunctionList KSPList              = 0;
+PetscFunctionList KSPList              = NULL;
 PetscBool         KSPRegisterAllCalled = PETSC_FALSE;
 
 /*@C
@@ -159,9 +159,9 @@ PetscErrorCode  KSPView(KSP ksp,PetscViewer viewer)
     ierr = PetscObjectGetComm((PetscObject)ksp,&comm);CHKERRQ(ierr);
     ierr = MPI_Comm_rank(comm,&rank);CHKERRQ(ierr);
     if (!rank) {
-      ierr = PetscViewerBinaryWrite(viewer,&classid,1,PETSC_INT,PETSC_FALSE);CHKERRQ(ierr);
+      ierr = PetscViewerBinaryWrite(viewer,&classid,1,PETSC_INT);CHKERRQ(ierr);
       ierr = PetscStrncpy(type,((PetscObject)ksp)->type_name,256);CHKERRQ(ierr);
-      ierr = PetscViewerBinaryWrite(viewer,type,256,PETSC_CHAR,PETSC_FALSE);CHKERRQ(ierr);
+      ierr = PetscViewerBinaryWrite(viewer,type,256,PETSC_CHAR);CHKERRQ(ierr);
     }
     if (ksp->ops->view) {
       ierr = (*ksp->ops->view)(ksp,viewer);CHKERRQ(ierr);
@@ -224,6 +224,28 @@ PetscErrorCode  KSPView(KSP ksp,PetscViewer viewer)
   PetscFunctionReturn(0);
 }
 
+/*@C
+   KSPViewFromOptions - View from Options
+
+   Collective on KSP
+
+   Input Parameters:
++  A - Krylov solver context
+.  obj - Optional object
+-  name - command line option
+
+   Level: intermediate
+.seealso:  KSP, KSPView, PetscObjectViewFromOptions(), KSPCreate()
+@*/
+PetscErrorCode  KSPViewFromOptions(KSP A,PetscObject obj,const char name[])
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(A,KSP_CLASSID,1);
+  ierr = PetscObjectViewFromOptions((PetscObject)A,obj,name);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
 
 /*@
    KSPSetNormType - Sets the norm that is used for convergence testing.
@@ -659,7 +681,7 @@ PetscErrorCode  KSPCreate(MPI_Comm comm,KSP *inksp)
 
   PetscFunctionBegin;
   PetscValidPointer(inksp,2);
-  *inksp = 0;
+  *inksp = NULL;
   ierr = KSPInitializePackage();CHKERRQ(ierr);
 
   ierr = PetscHeaderCreate(ksp,KSP_CLASSID,"KSP","Krylov Method","KSP",comm,KSPDestroy,KSPView);CHKERRQ(ierr);
@@ -693,12 +715,12 @@ PetscErrorCode  KSPCreate(MPI_Comm comm,KSP *inksp)
   ksp->ops->buildsolution = KSPBuildSolutionDefault;
   ksp->ops->buildresidual = KSPBuildResidualDefault;
 
-  ksp->vec_sol    = 0;
-  ksp->vec_rhs    = 0;
-  ksp->pc         = 0;
-  ksp->data       = 0;
+  ksp->vec_sol    = NULL;
+  ksp->vec_rhs    = NULL;
+  ksp->pc         = NULL;
+  ksp->data       = NULL;
   ksp->nwork      = 0;
-  ksp->work       = 0;
+  ksp->work       = NULL;
   ksp->reason     = KSP_CONVERGED_ITERATING;
   ksp->setupstage = KSP_SETUP_NEW;
 
@@ -749,7 +771,6 @@ PetscErrorCode  KSPSetType(KSP ksp, KSPType type)
 {
   PetscErrorCode ierr,(*r)(KSP);
   PetscBool      match;
-  void           *ctx;
 
   PetscFunctionBegin;
   PetscValidHeaderSpecific(ksp,KSP_CLASSID,1);
@@ -758,7 +779,7 @@ PetscErrorCode  KSPSetType(KSP ksp, KSPType type)
   ierr = PetscObjectTypeCompare((PetscObject)ksp,type,&match);CHKERRQ(ierr);
   if (match) PetscFunctionReturn(0);
 
-  ierr =  PetscFunctionListFind(KSPList,type,&r);CHKERRQ(ierr);
+  ierr = PetscFunctionListFind(KSPList,type,&r);CHKERRQ(ierr);
   if (!r) SETERRQ1(PetscObjectComm((PetscObject)ksp),PETSC_ERR_ARG_UNKNOWN_TYPE,"Unable to find requested KSP type %s",type);
   /* Destroy the previous private KSP context */
   if (ksp->ops->destroy) {
@@ -767,8 +788,6 @@ PetscErrorCode  KSPSetType(KSP ksp, KSPType type)
   }
   /* Reinitialize function pointers in KSPOps structure */
   ierr                    = PetscMemzero(ksp->ops,sizeof(struct _KSPOps));CHKERRQ(ierr);
-  ierr                    = KSPConvergedDefaultCreate(&ctx);CHKERRQ(ierr);
-  ierr                    = KSPSetConvergenceTest(ksp,KSPConvergedDefault,ctx,KSPConvergedDefaultDestroy);CHKERRQ(ierr);
   ksp->ops->buildsolution = KSPBuildSolutionDefault;
   ksp->ops->buildresidual = KSPBuildResidualDefault;
   ierr                    = KSPNormSupportTableReset_Private(ksp);CHKERRQ(ierr);
@@ -827,8 +846,7 @@ $     -ksp_type my_solver
 
    Level: advanced
 
-.seealso: KSPRegisterAll(), KSPRegisterDestroy()
-
+.seealso: KSPRegisterAll()
 @*/
 PetscErrorCode  KSPRegister(const char sname[],PetscErrorCode (*function)(KSP))
 {

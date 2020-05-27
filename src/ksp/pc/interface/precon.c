@@ -103,7 +103,7 @@ PetscErrorCode  PCDestroy(PC *pc)
   PetscFunctionBegin;
   if (!*pc) PetscFunctionReturn(0);
   PetscValidHeaderSpecific((*pc),PC_CLASSID,1);
-  if (--((PetscObject)(*pc))->refct > 0) {*pc = 0; PetscFunctionReturn(0);}
+  if (--((PetscObject)(*pc))->refct > 0) {*pc = NULL; PetscFunctionReturn(0);}
 
   ierr = PCReset(*pc);CHKERRQ(ierr);
 
@@ -364,7 +364,7 @@ PetscErrorCode  PCGetUseAmat(PC pc,PetscBool *flg)
 .  pc - location to put the preconditioner context
 
    Notes:
-   The default preconditioner for sparse matrices is PCILU or PCICC with 0 fill on one process and block Jacobi with PCILU or ICC
+   The default preconditioner for sparse matrices is PCILU or PCICC with 0 fill on one process and block Jacobi with PCILU or PCICC
    in parallel. For dense matrices it is always PCNONE.
 
    Level: developer
@@ -378,22 +378,22 @@ PetscErrorCode  PCCreate(MPI_Comm comm,PC *newpc)
 
   PetscFunctionBegin;
   PetscValidPointer(newpc,1);
-  *newpc = 0;
+  *newpc = NULL;
   ierr = PCInitializePackage();CHKERRQ(ierr);
 
   ierr = PetscHeaderCreate(pc,PC_CLASSID,"PC","Preconditioner","PC",comm,PCDestroy,PCView);CHKERRQ(ierr);
 
-  pc->mat                  = 0;
-  pc->pmat                 = 0;
+  pc->mat                  = NULL;
+  pc->pmat                 = NULL;
   pc->setupcalled          = 0;
   pc->setfromoptionscalled = 0;
-  pc->data                 = 0;
+  pc->data                 = NULL;
   pc->diagonalscale        = PETSC_FALSE;
-  pc->diagonalscaleleft    = 0;
-  pc->diagonalscaleright   = 0;
+  pc->diagonalscaleleft    = NULL;
+  pc->diagonalscaleright   = NULL;
 
-  pc->modifysubmatrices  = 0;
-  pc->modifysubmatricesP = 0;
+  pc->modifysubmatrices  = NULL;
+  pc->modifysubmatricesP = NULL;
 
   *newpc = pc;
   PetscFunctionReturn(0);
@@ -865,18 +865,18 @@ PetscErrorCode  PCSetUp(PC pc)
   ierr = PetscObjectStateGet((PetscObject)pc->pmat,&matstate);CHKERRQ(ierr);
   ierr = MatGetNonzeroState(pc->pmat,&matnonzerostate);CHKERRQ(ierr);
   if (!pc->setupcalled) {
-    ierr            = PetscInfo(pc,"Setting up PC for first time\n");CHKERRQ(ierr);
-    pc->flag        = DIFFERENT_NONZERO_PATTERN;
+    ierr     = PetscInfo(pc,"Setting up PC for first time\n");CHKERRQ(ierr);
+    pc->flag = DIFFERENT_NONZERO_PATTERN;
   } else if (matstate == pc->matstate) {
     ierr = PetscInfo(pc,"Leaving PC with identical preconditioner since operator is unchanged\n");CHKERRQ(ierr);
     PetscFunctionReturn(0);
   } else {
     if (matnonzerostate > pc->matnonzerostate) {
        ierr = PetscInfo(pc,"Setting up PC with different nonzero pattern\n");CHKERRQ(ierr);
-       pc->flag            = DIFFERENT_NONZERO_PATTERN;
+       pc->flag = DIFFERENT_NONZERO_PATTERN;
     } else {
       ierr = PetscInfo(pc,"Setting up PC with same nonzero pattern\n");CHKERRQ(ierr);
-      pc->flag            = SAME_NONZERO_PATTERN;
+      pc->flag = SAME_NONZERO_PATTERN;
     }
   }
   pc->matstate        = matstate;
@@ -960,7 +960,7 @@ $     func (PC pc,PetscInt nsub,IS *row,IS *col,Mat *submat,void *ctx);
 
    Level: advanced
 
-.seealso: PCModifySubMatrices(), PCASMGetSubMatrices()
+.seealso: PCModifySubMatrices()
 @*/
 PetscErrorCode  PCSetModifySubMatrices(PC pc,PetscErrorCode (*func)(PC,PetscInt,const IS[],const IS[],Mat[],void*),void *ctx)
 {
@@ -973,7 +973,7 @@ PetscErrorCode  PCSetModifySubMatrices(PC pc,PetscErrorCode (*func)(PC,PetscInt,
 
 /*@C
    PCModifySubMatrices - Calls an optional user-defined routine within
-   certain preconditioners if one has been set with PCSetModifySubMarices().
+   certain preconditioners if one has been set with PCSetModifySubMatrices().
 
    Collective on PC
 
@@ -1529,6 +1529,30 @@ PetscErrorCode  PCLoad(PC newdm, PetscViewer viewer)
 #if defined(PETSC_HAVE_SAWS)
 #include <petscviewersaws.h>
 #endif
+
+/*@C
+   PCViewFromOptions - View from Options
+
+   Collective on PC
+
+   Input Parameters:
++  A - the PC context
+.  obj - Optional object
+-  name - command line option
+
+   Level: intermediate
+.seealso:  PC, PCView, PetscObjectViewFromOptions(), PCCreate()
+@*/
+PetscErrorCode  PCViewFromOptions(PC A,PetscObject obj,const char name[])
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(A,PC_CLASSID,1);
+  ierr = PetscObjectViewFromOptions((PetscObject)A,obj,name);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
 /*@C
    PCView - Prints the PC data structure.
 
@@ -1623,9 +1647,9 @@ PetscErrorCode  PCView(PC pc,PetscViewer viewer)
     ierr = PetscObjectGetComm((PetscObject)pc,&comm);CHKERRQ(ierr);
     ierr = MPI_Comm_rank(comm,&rank);CHKERRQ(ierr);
     if (!rank) {
-      ierr = PetscViewerBinaryWrite(viewer,&classid,1,PETSC_INT,PETSC_FALSE);CHKERRQ(ierr);
+      ierr = PetscViewerBinaryWrite(viewer,&classid,1,PETSC_INT);CHKERRQ(ierr);
       ierr = PetscStrncpy(type,((PetscObject)pc)->type_name,256);CHKERRQ(ierr);
-      ierr = PetscViewerBinaryWrite(viewer,type,256,PETSC_CHAR,PETSC_FALSE);CHKERRQ(ierr);
+      ierr = PetscViewerBinaryWrite(viewer,type,256,PETSC_CHAR);CHKERRQ(ierr);
     }
     if (pc->ops->view) {
       ierr = (*pc->ops->view)(pc,viewer);CHKERRQ(ierr);
@@ -1691,7 +1715,7 @@ $     -pc_type my_solver
 
    Level: advanced
 
-.seealso: PCRegisterAll(), PCRegisterDestroy()
+.seealso: PCRegisterAll()
 @*/
 PetscErrorCode  PCRegister(const char sname[],PetscErrorCode (*function)(PC))
 {
@@ -1780,7 +1804,7 @@ PetscErrorCode  PCComputeOperator(PC pc,MatType mattype,Mat *mat)
 
 .seealso: MatSetNearNullSpace()
 @*/
-PetscErrorCode PCSetCoordinates(PC pc, PetscInt dim, PetscInt nloc, PetscReal *coords)
+PetscErrorCode PCSetCoordinates(PC pc, PetscInt dim, PetscInt nloc, PetscReal coords[])
 {
   PetscErrorCode ierr;
 

@@ -12,7 +12,7 @@
 #define islocaltoglobalmappinggetinfo_    islocaltoglobalmappinggetinfo
 #endif
 
-PETSC_EXTERN void PETSC_STDCALL islocaltoglobalmappingview_(ISLocalToGlobalMapping *mapping,PetscViewer *viewer,PetscErrorCode *ierr)
+PETSC_EXTERN void islocaltoglobalmappingview_(ISLocalToGlobalMapping *mapping,PetscViewer *viewer,PetscErrorCode *ierr)
 {
   PetscViewer v;
   PetscPatchDefaultViewers_Fortran(viewer,v);
@@ -21,7 +21,7 @@ PETSC_EXTERN void PETSC_STDCALL islocaltoglobalmappingview_(ISLocalToGlobalMappi
 
 static PetscInt  *sprocs, *snumprocs, **sindices;
 static PetscBool called;
-PETSC_EXTERN void PETSC_STDCALL islocaltoglobalmpnggetinfosize_(ISLocalToGlobalMapping *mapping,PetscInt *size,PetscInt *maxnumprocs,PetscErrorCode *ierr)
+PETSC_EXTERN void islocaltoglobalmpnggetinfosize_(ISLocalToGlobalMapping *mapping,PetscInt *size,PetscInt *maxnumprocs,PetscErrorCode *ierr)
 {
   PetscInt i;
   if (called) {*ierr = PETSC_ERR_ARG_WRONGSTATE; return;}
@@ -31,7 +31,7 @@ PETSC_EXTERN void PETSC_STDCALL islocaltoglobalmpnggetinfosize_(ISLocalToGlobalM
   called = PETSC_TRUE;
 }
 
-PETSC_EXTERN void PETSC_STDCALL islocaltoglobalmappinggetinfo_(ISLocalToGlobalMapping *mapping,PetscInt *size,PetscInt *procs,PetscInt *numprocs,
+PETSC_EXTERN void islocaltoglobalmappinggetinfo_(ISLocalToGlobalMapping *mapping,PetscInt *size,PetscInt *procs,PetscInt *numprocs,
                                                   PetscInt *indices,PetscErrorCode *ierr)
 {
   PetscInt i,j;
@@ -43,4 +43,13 @@ PETSC_EXTERN void PETSC_STDCALL islocaltoglobalmappinggetinfo_(ISLocalToGlobalMa
   }
   *ierr  = ISLocalToGlobalMappingRestoreInfo(*mapping,size,&sprocs,&snumprocs,&sindices); if (*ierr) return;
   called = PETSC_FALSE;
+}
+
+PETSC_EXTERN void islocaltoglobalmappingviewfromoptions_(ISLocalToGlobalMapping *ao,PetscObject obj,char* type,PetscErrorCode *ierr,PETSC_FORTRAN_CHARLEN_T len)
+{
+  char *t;
+
+  FIXCHAR(type,len,t);
+  *ierr = ISLocalToGlobalMappingViewFromOptions(*ao,obj,t);if (*ierr) return;
+  FREECHAR(type,t);
 }

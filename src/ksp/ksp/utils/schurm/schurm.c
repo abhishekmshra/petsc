@@ -1,6 +1,6 @@
 #include <../src/ksp/ksp/utils/schurm/schurm.h> /*I "petscksp.h" I*/
 
-const char *const MatSchurComplementAinvTypes[] = {"DIAG","LUMP","BLOCKDIAG","MatSchurComplementAinvType","MAT_SCHUR_COMPLEMENT_AINV_",0};
+const char *const MatSchurComplementAinvTypes[] = {"DIAG","LUMP","BLOCKDIAG","MatSchurComplementAinvType","MAT_SCHUR_COMPLEMENT_AINV_",NULL};
 
 PetscErrorCode MatCreateVecs_SchurComplement(Mat N,Vec *right,Vec *left)
 {
@@ -426,7 +426,7 @@ PetscErrorCode  MatSchurComplementUpdateSubMatrices(Mat S,Mat A00,Mat Ap00,Mat A
   Input Parameter:
 . S                - matrix obtained with MatCreateSchurComplement() (or equivalent) and implementing the action of A11 - A10 ksp(A00,Ap00) A01
 
-  Output Paramters:
+  Output Parameters:
 + A00,A01,A10,A11  - the four parts of the original matrix A = [A00 A01; A10 A11] (A11 is optional)
 - Ap00             - preconditioning matrix for use in ksp(A00,Ap00) to approximate the action of A^{-1}.
 
@@ -529,7 +529,7 @@ PetscErrorCode MatSchurComplementComputeExplicitOperator(Mat M, Mat *S)
 PetscErrorCode MatGetSchurComplement_Basic(Mat mat,IS isrow0,IS iscol0,IS isrow1,IS iscol1,MatReuse mreuse,Mat *newmat,MatSchurComplementAinvType ainvtype, MatReuse preuse,Mat *newpmat)
 {
   PetscErrorCode ierr;
-  Mat            A=0,Ap=0,B=0,C=0,D=0;
+  Mat            A=NULL,Ap=NULL,B=NULL,C=NULL,D=NULL;
   MatReuse       reuse;
 
   PetscFunctionBegin;

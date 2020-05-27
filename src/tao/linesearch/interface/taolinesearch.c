@@ -9,6 +9,29 @@ PetscLogEvent TAOLINESEARCH_Apply;
 PetscLogEvent TAOLINESEARCH_Eval;
 
 /*@C
+   TaoLineSearchViewFromOptions - View from Options
+
+   Collective on TaoLineSearch
+
+   Input Parameters:
++  A - the Tao context
+.  obj - Optional object
+-  name - command line option
+
+   Level: intermediate
+.seealso:  TaoLineSearch, TaoLineSearchView, PetscObjectViewFromOptions(), TaoLineSearchCreate()
+@*/
+PetscErrorCode  TaoLineSearchViewFromOptions(TaoLineSearch A,PetscObject obj,const char name[])
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(A,TAOLINESEARCH_CLASSID,1);
+  ierr = PetscObjectViewFromOptions((PetscObject)A,obj,name);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+/*@C
   TaoLineSearchView - Prints information about the TaoLineSearch
 
   Collective on TaoLineSearch
@@ -129,17 +152,17 @@ PetscErrorCode TaoLineSearchCreate(MPI_Comm comm, TaoLineSearch *newls)
   ls->ngeval=0;
   ls->nfgeval=0;
 
-  ls->ops->computeobjective=0;
-  ls->ops->computegradient=0;
-  ls->ops->computeobjectiveandgradient=0;
-  ls->ops->computeobjectiveandgts=0;
-  ls->ops->setup=0;
-  ls->ops->apply=0;
-  ls->ops->view=0;
-  ls->ops->setfromoptions=0;
-  ls->ops->reset=0;
-  ls->ops->destroy=0;
-  ls->ops->monitor=0;
+  ls->ops->computeobjective = NULL;
+  ls->ops->computegradient = NULL;
+  ls->ops->computeobjectiveandgradient = NULL;
+  ls->ops->computeobjectiveandgts = NULL;
+  ls->ops->setup = NULL;
+  ls->ops->apply = NULL;
+  ls->ops->view = NULL;
+  ls->ops->setfromoptions = NULL;
+  ls->ops->reset = NULL;
+  ls->ops->destroy = NULL;
+  ls->ops->monitor = NULL;
   ls->usemonitor=PETSC_FALSE;
   ls->setupcalled=PETSC_FALSE;
   ls->usetaoroutines=PETSC_FALSE;
@@ -242,7 +265,7 @@ PetscErrorCode TaoLineSearchReset(TaoLineSearch ls)
 
   Collective on TaoLineSearch
 
-  Input Parameter
+  Input Parameter:
 . ls - the TaoLineSearch context
 
   Level: beginner
@@ -256,7 +279,7 @@ PetscErrorCode TaoLineSearchDestroy(TaoLineSearch *ls)
   PetscFunctionBegin;
   if (!*ls) PetscFunctionReturn(0);
   PetscValidHeaderSpecific(*ls,TAOLINESEARCH_CLASSID,1);
-  if (--((PetscObject)*ls)->refct > 0) {*ls=0; PetscFunctionReturn(0);}
+  if (--((PetscObject)*ls)->refct > 0) {*ls = NULL; PetscFunctionReturn(0);}
   ierr = VecDestroy(&(*ls)->stepdirection);CHKERRQ(ierr);
   ierr = VecDestroy(&(*ls)->start_x);CHKERRQ(ierr);
   if ((*ls)->ops->destroy) {
@@ -449,11 +472,11 @@ PetscErrorCode TaoLineSearchSetType(TaoLineSearch ls, TaoLineSearchType type)
   ls->nfeval=0;
   ls->ngeval=0;
   ls->nfgeval=0;
-  ls->ops->setup=0;
-  ls->ops->apply=0;
-  ls->ops->view=0;
-  ls->ops->setfromoptions=0;
-  ls->ops->destroy=0;
+  ls->ops->setup = NULL;
+  ls->ops->apply = NULL;
+  ls->ops->view = NULL;
+  ls->ops->setfromoptions = NULL;
+  ls->ops->destroy = NULL;
   ls->setupcalled = PETSC_FALSE;
   ierr = (*r)(ls);CHKERRQ(ierr);
   ierr = PetscObjectChangeTypeName((PetscObject)ls, type);CHKERRQ(ierr);
@@ -569,7 +592,7 @@ PetscErrorCode TaoLineSearchSetFromOptions(TaoLineSearch ls)
   Input Parameter:
 . ls - the TaoLineSearch context
 
-  Output Paramter:
+  Output Parameter:
 . type - the line search algorithm in effect
 
   Level: developer
@@ -1224,7 +1247,7 @@ PetscErrorCode TaoLineSearchSetInitialStepLength(TaoLineSearch ls,PetscReal s)
   Input Parameters:
 . ls - the TaoLineSearch context
 
-  Output Parameters
+  Output Parameters:
 . s - the current step length
 
   Level: beginner

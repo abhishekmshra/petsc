@@ -87,7 +87,7 @@ PETSC_EXTERN PetscErrorCode SNESGetSolutionUpdate(SNES,Vec*);
 PETSC_EXTERN PetscErrorCode SNESGetRhs(SNES,Vec*);
 PETSC_EXTERN PetscErrorCode SNESView(SNES,PetscViewer);
 PETSC_EXTERN PetscErrorCode SNESLoad(SNES,PetscViewer);
-PETSC_STATIC_INLINE PetscErrorCode SNESViewFromOptions(SNES A,PetscObject obj,const char name[]) {return PetscObjectViewFromOptions((PetscObject)A,obj,name);}
+PETSC_EXTERN PetscErrorCode SNESViewFromOptions(SNES,PetscObject,const char[]);
 PETSC_EXTERN PetscErrorCode SNESReasonView(SNES,PetscViewer);
 PETSC_EXTERN PetscErrorCode SNESReasonViewFromOptions(SNES);
 
@@ -185,6 +185,7 @@ PETSC_EXTERN PetscErrorCode SNESSetJacobianDomainError(SNES);
 PETSC_EXTERN PetscErrorCode SNESSetCheckJacobianDomainError(SNES,PetscBool);
 PETSC_EXTERN PetscErrorCode SNESGetCheckJacobianDomainError(SNES,PetscBool*);
 
+#define SNES_CONVERGED_TR_DELTA_DEPRECATED SNES_CONVERGED_TR_DELTA PETSC_DEPRECATED_ENUM("Use SNES_DIVERGED_TR_DELTA (since version 3.12)")
 /*E
     SNESConvergedReason - reason a SNES method was said to
          have converged or diverged
@@ -252,6 +253,7 @@ typedef enum {/* converged */
               SNES_DIVERGED_DTOL                = -9, /* || F || > divtol*||F_initial|| */
               SNES_DIVERGED_JACOBIAN_DOMAIN     = -10, /* Jacobian calculation does not make sense */
               SNES_DIVERGED_TR_DELTA            = -11,
+              SNES_CONVERGED_TR_DELTA_DEPRECATED = -11,
 
               SNES_CONVERGED_ITERATING          =  0} SNESConvergedReason;
 PETSC_EXTERN const char *const*SNESConvergedReasons;
@@ -558,6 +560,7 @@ PETSC_EXTERN PetscErrorCode SNESLineSearchCreate(MPI_Comm, SNESLineSearch*);
 PETSC_EXTERN PetscErrorCode SNESLineSearchReset(SNESLineSearch);
 PETSC_EXTERN PetscErrorCode SNESLineSearchView(SNESLineSearch,PetscViewer);
 PETSC_EXTERN PetscErrorCode SNESLineSearchDestroy(SNESLineSearch *);
+PETSC_EXTERN PetscErrorCode SNESLineSearchGetType(SNESLineSearch, SNESLineSearchType *);
 PETSC_EXTERN PetscErrorCode SNESLineSearchSetType(SNESLineSearch, SNESLineSearchType);
 PETSC_EXTERN PetscErrorCode SNESLineSearchSetFromOptions(SNESLineSearch);
 PETSC_EXTERN PetscErrorCode SNESLineSearchSetFunction(SNESLineSearch,PetscErrorCode (*)(SNES,Vec,Vec));
@@ -729,12 +732,13 @@ PETSC_EXTERN PetscErrorCode SNESMultiblockSetType(SNES, PCCompositeType);
 
    Level: intermediate
 
-.seealso: SNESMSSetType(), SNES
+.seealso: SNESMSGetType(), SNESMSSetType(), SNES
 J*/
 typedef const char* SNESMSType;
 #define SNESMSM62       "m62"
 #define SNESMSEULER     "euler"
 #define SNESMSJAMESON83 "jameson83"
+#define SNESMSVLTP11    "vltp11"
 #define SNESMSVLTP21    "vltp21"
 #define SNESMSVLTP31    "vltp31"
 #define SNESMSVLTP41    "vltp41"
@@ -742,7 +746,10 @@ typedef const char* SNESMSType;
 #define SNESMSVLTP61    "vltp61"
 
 PETSC_EXTERN PetscErrorCode SNESMSRegister(SNESMSType,PetscInt,PetscInt,PetscReal,const PetscReal[],const PetscReal[],const PetscReal[]);
+PETSC_EXTERN PetscErrorCode SNESMSGetType(SNES,SNESMSType*);
 PETSC_EXTERN PetscErrorCode SNESMSSetType(SNES,SNESMSType);
+PETSC_EXTERN PetscErrorCode SNESMSGetDamping(SNES,PetscReal*);
+PETSC_EXTERN PetscErrorCode SNESMSSetDamping(SNES,PetscReal);
 PETSC_EXTERN PetscErrorCode SNESMSFinalizePackage(void);
 PETSC_EXTERN PetscErrorCode SNESMSInitializePackage(void);
 PETSC_EXTERN PetscErrorCode SNESMSRegisterDestroy(void);
@@ -780,8 +787,8 @@ PETSC_EXTERN PetscErrorCode SNESNCGSetType(SNES, SNESNCGType);
 
 typedef enum {SNES_QN_SCALE_DEFAULT    = 0,
               SNES_QN_SCALE_NONE       = 1,
-              SNES_QN_SCALE_SHANNO     = 2,
-              SNES_QN_SCALE_LINESEARCH = 3,
+              SNES_QN_SCALE_SCALAR     = 2,
+              SNES_QN_SCALE_DIAGONAL   = 3,
               SNES_QN_SCALE_JACOBIAN   = 4} SNESQNScaleType;
 PETSC_EXTERN const char *const SNESQNScaleTypes[];
 typedef enum {SNES_QN_RESTART_DEFAULT  = 0,

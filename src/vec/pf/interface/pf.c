@@ -213,6 +213,29 @@ PetscErrorCode  PFApply(PF pf,PetscInt n,const PetscScalar *x,PetscScalar *y)
   PetscFunctionReturn(0);
 }
 
+/*@C
+   PFViewFromOptions - View from Options
+
+   Collective on PF
+
+   Input Parameters:
++  A - the PF context
+.  obj - Optional object
+-  name - command line option
+
+   Level: intermediate
+.seealso:  PF, PFView, PetscObjectViewFromOptions(), PFCreate()
+@*/
+PetscErrorCode  PFViewFromOptions(PF A,PetscObject obj,const char name[])
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(A,PF_CLASSID,1);
+  ierr = PetscObjectViewFromOptions((PetscObject)A,obj,name);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
 /*@
    PFView - Prints information about a mathematical function
 
@@ -465,11 +488,12 @@ PetscErrorCode  PFInitializePackage(void)
   ierr = PetscClassIdRegister("PointFunction",&PF_CLASSID);CHKERRQ(ierr);
   /* Register Constructors */
   ierr = PFRegisterAll();CHKERRQ(ierr);
-  /* Process info exclusions */
-  ierr = PetscOptionsGetString(NULL,NULL,"-info_exclude",logList,sizeof(logList),&opt);CHKERRQ(ierr);
-  if (opt) {
-    ierr = PetscStrInList("pf",logList,',',&pkg);CHKERRQ(ierr);
-    if (pkg) {ierr = PetscInfoDeactivateClass(PF_CLASSID);CHKERRQ(ierr);}
+  /* Process Info */
+  {
+    PetscClassId  classids[1];
+
+    classids[0] = PF_CLASSID;
+    ierr = PetscInfoProcessClass("pf", 1, classids);CHKERRQ(ierr);
   }
   /* Process summary exclusions */
   ierr = PetscOptionsGetString(NULL,NULL,"-log_exclude",logList,sizeof(logList),&opt);CHKERRQ(ierr);

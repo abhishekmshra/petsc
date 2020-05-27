@@ -443,30 +443,18 @@ static PetscErrorCode KSPAGMRESBuildSoln(KSP ksp,PetscInt it)
     }
   }
   /* QR factorize the Hessenberg matrix */
-#if defined(PETSC_MISSING_LAPACK_GEQRF)
-  SETERRQ(PetscObjectComm((PetscObject)ksp),PETSC_ERR_SUP,"GEQRF - Lapack routine is unavailable.");
-#else
   PetscStackCallBLAS("LAPACKgeqrf",LAPACKgeqrf_(&lC, &KspSize, agmres->hh_origin, &ldH, agmres->tau, agmres->work, &lwork, &info));
   if (info) SETERRQ1(PetscObjectComm((PetscObject)ksp), PETSC_ERR_LIB,"Error in LAPACK routine XGEQRF INFO=%d", info);
-#endif
   /* Update the right hand side of the least square problem */
   ierr = PetscArrayzero(agmres->nrs, N);CHKERRQ(ierr);
 
   agmres->nrs[0] = ksp->rnorm;
-#if defined(PETSC_MISSING_LAPACK_ORMQR)
-  SETERRQ(PetscObjectComm((PetscObject)ksp),PETSC_ERR_SUP,"GEQRF - Lapack routine is unavailable.");
-#else
   PetscStackCallBLAS("LAPACKormqr",LAPACKormqr_("L", "T", &lC, &nrhs, &KspSize, agmres->hh_origin, &ldH, agmres->tau, agmres->nrs, &N, agmres->work, &lwork, &info));
   if (info) SETERRQ1(PetscObjectComm((PetscObject)ksp), PETSC_ERR_LIB,"Error in LAPACK routine XORMQR INFO=%d",info);
-#endif
   ksp->rnorm = PetscAbsScalar(agmres->nrs[KspSize]);
   /* solve the least-square problem */
-#if defined(PETSC_MISSING_LAPACK_TRTRS)
-  SETERRQ(PetscObjectComm((PetscObject)ksp),PETSC_ERR_SUP,"TRTRS - Lapack routine is unavailable.");
-#else
   PetscStackCallBLAS("LAPACKtrtrs",LAPACKtrtrs_("U", "N", "N", &KspSize, &nrhs, agmres->hh_origin, &ldH, agmres->nrs, &N, &info));
   if (info) SETERRQ1(PetscObjectComm((PetscObject)ksp), PETSC_ERR_LIB,"Error in LAPACK routine XTRTRS INFO=%d",info);
-#endif
   /* Accumulate the correction to the solution of the preconditioned problem in VEC_TMP */
   ierr = VecZeroEntries(VEC_TMP);CHKERRQ(ierr);
   ierr = VecMAXPY(VEC_TMP, max_k, agmres->nrs, &VEC_V(0));CHKERRQ(ierr);
@@ -776,12 +764,12 @@ PETSC_EXTERN PetscErrorCode KSPCreate_AGMRES(KSP ksp)
   agmres->q_preallocate  = 0;
   agmres->delta_allocate = AGMRES_DELTA_DIRECTIONS;
   agmres->orthog         = KSPGMRESClassicalGramSchmidtOrthogonalization;
-  agmres->nrs            = 0;
-  agmres->sol_temp       = 0;
+  agmres->nrs            = NULL;
+  agmres->sol_temp       = NULL;
   agmres->max_k          = AGMRES_DEFAULT_MAXK;
-  agmres->Rsvd           = 0;
+  agmres->Rsvd           = NULL;
   agmres->cgstype        = KSP_GMRES_CGS_REFINE_NEVER;
-  agmres->orthogwork     = 0;
+  agmres->orthogwork     = NULL;
 
   /* Default values for the deflation */
   agmres->r           = 0;

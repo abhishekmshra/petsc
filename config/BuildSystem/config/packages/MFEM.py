@@ -38,7 +38,8 @@ class Configure(config.package.Package):
 
     buildDir = os.path.join(self.packageDir,'petsc-build')
     configDir = os.path.join(buildDir,'config')
-    os.makedirs(configDir)
+    if not os.path.exists(configDir):
+      os.makedirs(configDir)
 
     if self.framework.argDB['prefix']:
       PETSC_DIR  = os.path.abspath(os.path.expanduser(self.argDB['prefix']))
@@ -85,7 +86,7 @@ class Configure(config.package.Package):
       g.write('ARFLAGS = '+self.setCompilers.AR_FLAGS+'\n')
       g.write('LDFLAGS = '+ldflags+'\n')
       g.write('MFEM_USE_MPI = YES\n')
-      g.write('MFEM_MPIEXEC = '+self.mpi.mpiexec+'\n')
+      g.write('MFEM_MPIEXEC = '+self.mpi.getMakeMacro('MPIEXEC')+'\n')
       g.write('MFEM_USE_METIS_5 = YES\n')
       g.write('MFEM_USE_METIS = YES\n')
       g.write('MFEM_USE_PETSC = YES\n')

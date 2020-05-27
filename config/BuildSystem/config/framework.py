@@ -59,7 +59,7 @@ import pickle
 try:
   from hashlib import md5 as new_md5
 except ImportError:
-  from md5 import new as new_md5
+  from md5 import new as new_md5 # novermin
 
 
 class Framework(config.base.Configure, script.LanguageProcessor):
@@ -107,6 +107,7 @@ class Framework(config.base.Configure, script.LanguageProcessor):
     self.createChildren()
     # Create argDB for user specified options only
     self.clArgDB = dict([(nargs.Arg.parseArgument(arg)[0], arg) for arg in self.clArgs])
+    self.defineDict = {}
     return
 
   def __getstate__(self):
@@ -620,16 +621,13 @@ class Framework(config.base.Configure, script.LanguageProcessor):
     self.actions.addArgument('Framework', 'RDict update', 'Substitutions were stored in RDict with parent '+str(argDB.parentDirectory))
     return
 
-  def outputDefine(self, f, name, value = None, comment = ''):
+  def outputDefine(self, f, name, value = None):
     '''Define "name" to "value" in the configuration header'''
     # we need to keep the libraries in this list and simply not print them at the end
     # because libraries.havelib() is used to find library in this list we had to list the libraries in the
     # list even though we don't need them in petscconf.h
     # two packages have LIB in there name so we have to include them here
     if (name.startswith('PETSC_HAVE_LIB') and not name in ['PETSC_HAVE_LIBPNG','PETSC_HAVE_LIBJPEG']) or (name.startswith('PETSC_HAVE_') and name.endswith('LIB')): return
-    if comment:
-      for line in comment.split('\n'):
-        if line: f.write('/* '+line+' */\n')
     if value:
       f.write('#define '+name+' '+str(value)+'\n')
     else:
@@ -677,27 +675,24 @@ class Framework(config.base.Configure, script.LanguageProcessor):
     if prefix:         prefix = prefix+'_'
     return prefix+name
 
-  def outputDefines(self, f, child, prefix = None):
+  def processDefines(self, child, prefix = None):
     '''If the child contains a dictionary named "defines", the entries are output as defines in the config header.
     The prefix to each define is calculated as follows:
     - If the prefix argument is given, this is used, otherwise
     - If the child contains "headerPrefix", this is used, otherwise
     - If the module containing the child class is not "__main__", this is used, otherwise
     - No prefix is used
-    If the child contains a dictionary named "help", then a help string will be added before the define
     '''
     if not hasattr(child, 'defines') or not isinstance(child.defines, dict): return
-    if hasattr(child, 'help') and isinstance(child.help, dict):
-      help = child.help
-    else:
-      help = {}
-    for pair in sorted(child.defines.items()):
+    for pair in child.defines.items():
       if not pair[1]: continue
-      if pair[0] in help:
-        self.outputDefine(f, self.getFullDefineName(child, pair[0], prefix), pair[1], help[pair[0]])
-      else:
-        self.outputDefine(f, self.getFullDefineName(child, pair[0], prefix), pair[1])
+      item = (self.getFullDefineName(child, pair[0], prefix), pair[1])
+      self.defineDict.update({item[0] : item})
     return
+
+  def outputDefines(self, f):
+    for item in sorted(self.defineDict):
+      self.outputDefine(f, *self.defineDict[item])
 
   def outputPkgVersion(self, f, child):
     '''If the child contains a tuple named "version_tuple", the entries are output in the config package header.'''
@@ -808,9 +803,10 @@ class Framework(config.base.Configure, script.LanguageProcessor):
     f.write('#define '+guard+'\n\n')
     if hasattr(self, 'headerTop'):
       f.write(str(self.headerTop)+'\n')
-    self.outputDefines(f, self, prefix)
+    self.processDefines(self, prefix)
     for child in self.childGraph.vertices:
-      self.outputDefines(f, child, prefix)
+      self.processDefines(child, prefix)
+    self.outputDefines(f)
     if hasattr(self, 'headerBottom'):
       f.write(str(self.headerBottom)+'\n')
     f.write('#endif\n')
@@ -1020,7 +1016,7 @@ class Framework(config.base.Configure, script.LanguageProcessor):
   #  the only allow non-blocking IO operations etc, they don't provide real parallelism
   #  Also changing values in LIBS is currently buggy for threads as are possible other variables
   def parallelQueueEvaluation(self, depGraph, numThreads = 1):
-    import Queue
+    import Queue # novermin
     from threading import Thread
 
     if numThreads < 1: raise RuntimeError('Parallel configure must use at least one thread')
@@ -1050,6 +1046,7 @@ class Framework(config.base.Configure, script.LanguageProcessor):
         # the handling of logs, error messages, and tracebacks from errors in children
         # does not work correctly.
         except (RuntimeError, config.base.ConfigureSetupError) as e:
+          tbo = sys.exc_info()[2]
           emsg = str(e)
           if not emsg.endswith('\n'): emsg = emsg+'\n'
           msg ='*******************************************************************************\n'\
@@ -1067,6 +1064,7 @@ class Framework(config.base.Configure, script.LanguageProcessor):
               +emsg+'*******************************************************************************\n'
           se = ''
         except ImportError as e :
+          tbo = sys.exc_info()[2]
           emsg = str(e)
           if not emsg.endswith('\n'): emsg = emsg+'\n'
           msg ='*******************************************************************************\n'\
@@ -1075,6 +1073,7 @@ class Framework(config.base.Configure, script.LanguageProcessor):
               +emsg+'*******************************************************************************\n'
           se = ''
         except OSError as e :
+          tbo = sys.exc_info()[2]
           emsg = str(e)
           if not emsg.endswith('\n'): emsg = emsg+'\n'
           msg ='*******************************************************************************\n'\
@@ -1083,6 +1082,7 @@ class Framework(config.base.Configure, script.LanguageProcessor):
               +emsg+'*******************************************************************************\n'
           se = ''
         except SystemExit as e:
+          tbo = sys.exc_info()[2]
           if e.code is None or e.code == 0:
             return
           msg ='*******************************************************************************\n'\
@@ -1090,6 +1090,7 @@ class Framework(config.base.Configure, script.LanguageProcessor):
               +'*******************************************************************************\n'
           se  = str(e)
         except Exception as e:
+          tbo = sys.exc_info()[2]
           msg ='*******************************************************************************\n'\
               +'        CONFIGURATION CRASH  (Please send configure.log to petsc-maint@mcs.anl.gov)\n' \
               +'*******************************************************************************\n'
@@ -1108,7 +1109,7 @@ class Framework(config.base.Configure, script.LanguageProcessor):
         # Udpate queue
         #self.logPrint('PUSH  %s to DONE ' % child.__class__.__module__)
         done.put((ret, out, emsg, child))
-        q.task_done()
+        q.task_done() # novermin
         if ret: break
       return
 
@@ -1137,17 +1138,51 @@ class Framework(config.base.Configure, script.LanguageProcessor):
         if push:
           #self.logPrint('PUSH %s to   TODO' % child.__class__.__module__)
           todo.put(child)
-      done.task_done()
-    todo.join()
-    done.join()
+      done.task_done() # novermin
+    todo.join() # novermin
+    done.join() # novermin
     return
 
   def serialEvaluation(self, depGraph):
     import graph
 
+    ndepGraph = graph.DirectedGraph.topologicalSort(depGraph)
+    for child in ndepGraph:
+      if hasattr(child,'setCompilers'): setCompilers = child.setCompilers
+
+    ndepGraph = graph.DirectedGraph.topologicalSort(depGraph)
+    for child in ndepGraph:
+      if (self.argDB['with-batch'] and
+          hasattr(child,'package') and
+          'download-'+child.package in self.framework.clArgDB and
+          self.argDB['download-'+child.package] and not
+          (hasattr(setCompilers,'cross_cc') or child.installwithbatch)): raise RuntimeError('--download-'+child.package+' cannot be used on this batch systems\n')
+
+      # note, only classes derived from package.py have this attribute
+      if hasattr(child,'deps'):
+        found = 0
+        if child.lookforbydefault: found = 1
+        if 'download-'+child.package in self.framework.clArgDB and self.argDB['download-'+child.package]: found = 1
+        if 'with-'+child.package in self.framework.clArgDB and self.argDB['with-'+child.package]: found = 1
+        if 'with-'+child.package+'-lib' in self.framework.clArgDB and self.argDB['with-'+child.package+'-lib']: found = 1
+        if 'with-'+child.package+'-dir' in self.framework.clArgDB and self.argDB['with-'+child.package+'-dir']: found = 1
+        if not found: continue
+        msg = ''
+        for dep in child.deps:
+          found = 0
+          if dep.lookforbydefault: found = 1
+          if 'download-'+dep.package in self.framework.clArgDB and self.argDB['download-'+dep.package]: found = 1
+          if 'with-'+dep.package in self.framework.clArgDB and self.argDB['with-'+dep.package]: found = 1
+          if 'with-'+dep.package+'-lib' in self.framework.clArgDB and self.argDB['with-'+dep.package+'-lib']: found = 1
+          if 'with-'+dep.package+'-dir' in self.framework.clArgDB and self.argDB['with-'+dep.package+'-dir']: found = 1
+          if not found: msg += 'Package '+child.package+' requested but dependency '+dep.package+' not requested. Perhaps you want --download-'+dep.package+'\n'
+        if msg: raise RuntimeError(msg)
+        if child.cxx and ('with-cxx' in self.framework.clArgDB) and (self.argDB['with-cxx'] == '0'): raise RuntimeError('Package '+child.package+' requested requires C++ but compiler turned off.')
+        if child.fc and ('with-fc' in self.framework.clArgDB) and (self.argDB['with-fc'] == '0'): raise RuntimeError('Package '+child.package+' requested requires Fortran but compiler turned off.')
+
+    depGraph = graph.DirectedGraph.topologicalSort(depGraph)
     totaltime = 0
     starttime = time.time()
-    depGraph = graph.DirectedGraph.topologicalSort(depGraph)
     for child in depGraph:
       start = time.time()
       if not hasattr(child, '_configured'):
@@ -1169,9 +1204,9 @@ class Framework(config.base.Configure, script.LanguageProcessor):
     useParallel = False
     if script.useParallel:
       try:
-        import Queue
+        import Queue # novermin
         from threading import Thread
-        if hasattr(Queue.Queue(), 'join'): useParallel = True
+        if hasattr(Queue.Queue(), 'join'): useParallel = True # novermin
       except: pass
     if useParallel:
       self.parallelQueueEvaluation(self.childGraph, script.useParallel)

@@ -719,6 +719,11 @@ PetscErrorCode MatMultAdd_SeqSBAIJ_1(Mat A,Vec xx,Vec yy,Vec zz)
   PetscInt          mbs =a->mbs,i,n,cval,j,jmin;
   const PetscInt    *aj=a->j,*ai=a->i,*ib;
   PetscInt          nonzerorow=0;
+#if defined(PETSC_USE_COMPLEX)
+  const int         aconj = A->hermitian;
+#else
+  const int         aconj = 0;
+#endif
 
   PetscFunctionBegin;
   ierr = VecCopy(yy,zz);CHKERRQ(ierr);
@@ -734,13 +739,21 @@ PetscErrorCode MatMultAdd_SeqSBAIJ_1(Mat A,Vec xx,Vec yy,Vec zz)
     ib          = aj + *ai;
     jmin        = 0;
     nonzerorow += (n>0);
-    if (*ib == i) {            /* (diag of A)*x */
+    if (n && *ib == i) {            /* (diag of A)*x */
       z[i] += *v++ * x[*ib++]; jmin++;
     }
-    for (j=jmin; j<n; j++) {
-      cval    = *ib;
-      z[cval] += *v * x1;      /* (strict lower triangular part of A)*x  */
-      z[i] += *v++ * x[*ib++]; /* (strict upper triangular part of A)*x  */
+    if (aconj) {
+      for (j=jmin; j<n; j++) {
+        cval    = *ib;
+        z[cval] += PetscConj(*v) * x1; /* (strict lower triangular part of A)*x  */
+        z[i]    += *v++ * x[*ib++];    /* (strict upper triangular part of A)*x  */
+      }
+    } else {
+      for (j=jmin; j<n; j++) {
+        cval    = *ib;
+        z[cval] += *v * x1;         /* (strict lower triangular part of A)*x  */
+        z[i]    += *v++ * x[*ib++]; /* (strict upper triangular part of A)*x  */
+      }
     }
     xb++; ai++;
   }
@@ -1482,30 +1495,13 @@ PetscErrorCode MatGetRowMaxAbs_SeqSBAIJ(Mat A,Vec v,PetscInt idx[])
   PetscFunctionReturn(0);
 }
 
-PETSC_INTERN PetscErrorCode MatMatMult_SeqSBAIJ_SeqDense(Mat A,Mat B,MatReuse scall,PetscReal fill,Mat *C)
-{
-  PetscErrorCode ierr;
-
-  PetscFunctionBegin;
-  if (scall == MAT_INITIAL_MATRIX) {
-    ierr = PetscLogEventBegin(MAT_MatMultSymbolic,A,B,0,0);CHKERRQ(ierr);
-    ierr = MatMatMultSymbolic_SeqSBAIJ_SeqDense(A,B,fill,C);CHKERRQ(ierr);
-    ierr = PetscLogEventEnd(MAT_MatMultSymbolic,A,B,0,0);CHKERRQ(ierr);
-  }
-  ierr = PetscLogEventBegin(MAT_MatMultNumeric,A,B,0,0);CHKERRQ(ierr);
-  ierr = MatMatMultNumeric_SeqSBAIJ_SeqDense(A,B,*C);CHKERRQ(ierr);
-  ierr = PetscLogEventEnd(MAT_MatMultNumeric,A,B,0,0);CHKERRQ(ierr);
-  PetscFunctionReturn(0);
-}
-
-PetscErrorCode MatMatMultSymbolic_SeqSBAIJ_SeqDense(Mat A,Mat B,PetscReal fill,Mat *C)
+PetscErrorCode MatMatMultSymbolic_SeqSBAIJ_SeqDense(Mat A,Mat B,PetscReal fill,Mat C)
 {
   PetscErrorCode ierr;
 
   PetscFunctionBegin;
   ierr = MatMatMultSymbolic_SeqDense_SeqDense(A,B,0.0,C);CHKERRQ(ierr);
-
-  (*C)->ops->matmultnumeric = MatMatMultNumeric_SeqSBAIJ_SeqDense;
+  C->ops->matmultnumeric = MatMatMultNumeric_SeqSBAIJ_SeqDense;
   PetscFunctionReturn(0);
 }
 
@@ -1517,6 +1513,11 @@ PetscErrorCode MatMatMult_SeqSBAIJ_1_Private(Mat A,PetscScalar* b,PetscInt bm,Pe
   PetscScalar       x1;
   const MatScalar   *v = a->a,*vv;
   PetscInt          mbs = a->mbs,i,*idx = a->j,*ii = a->i,j,*jj,n,k;
+#if defined(PETSC_USE_COMPLEX)
+  const int         aconj = A->hermitian;
+#else
+  const int         aconj = 0;
+#endif
 
   PetscFunctionBegin;
   for (i=0; i<mbs; i++) {
@@ -1531,7 +1532,7 @@ PetscErrorCode MatMatMult_SeqSBAIJ_1_Private(Mat A,PetscScalar* b,PetscInt bm,Pe
       for (j=0; j<n; j++) {
         xb = b + (*idx); x1 = xb[0+k*bm];
         z[0+k*cm] += v[0]*x1;
-        if (*idx != i) c[(*idx)+k*cm] += v[0]*b[i+k*bm];
+        if (*idx != i) c[(*idx)+k*cm] += (aconj ? PetscConj(v[0]) : v[0])*b[i+k*bm];
         v += 1;
         ++idx;
       }

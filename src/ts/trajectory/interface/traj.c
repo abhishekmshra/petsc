@@ -270,6 +270,29 @@ PetscErrorCode TSTrajectoryGetVecs(TSTrajectory tj,TS ts,PetscInt stepnum,PetscR
 }
 
 /*@C
+   TSTrajectoryViewFromOptions - View from Options
+
+   Collective on TSTrajectory
+
+   Input Parameters:
++  A - the TSTrajectory context
+.  obj - Optional object
+-  name - command line option
+
+   Level: intermediate
+.seealso:  TSTrajectory, TSTrajectoryView, PetscObjectViewFromOptions(), TSTrajectoryCreate()
+@*/
+PetscErrorCode  TSTrajectoryViewFromOptions(TSTrajectory A,PetscObject obj,const char name[])
+{
+  PetscErrorCode ierr;
+
+  PetscFunctionBegin;
+  PetscValidHeaderSpecific(A,TSTRAJECTORY_CLASSID,1);
+  ierr = PetscObjectViewFromOptions((PetscObject)A,obj,name);CHKERRQ(ierr);
+  PetscFunctionReturn(0);
+}
+
+/*@C
     TSTrajectoryView - Prints information about the trajectory object
 
     Collective on TSTrajectory
@@ -578,7 +601,7 @@ PetscErrorCode TSTrajectoryDestroy(TSTrajectory *tj)
   PetscFunctionBegin;
   if (!*tj) PetscFunctionReturn(0);
   PetscValidHeaderSpecific((*tj),TSTRAJECTORY_CLASSID,1);
-  if (--((PetscObject)(*tj))->refct > 0) {*tj = 0; PetscFunctionReturn(0);}
+  if (--((PetscObject)(*tj))->refct > 0) {*tj = NULL; PetscFunctionReturn(0);}
 
   ierr = TSTrajectoryReset(*tj);CHKERRQ(ierr);
   ierr = TSHistoryDestroy(&(*tj)->tsh);CHKERRQ(ierr);
@@ -844,12 +867,12 @@ PetscErrorCode  TSTrajectorySetFromOptions(TSTrajectory tj,TS ts)
   ierr = PetscOptionsBool("-ts_trajectory_keep_files","Keep any trajectory files generated during the run","TSTrajectorySetKeepFiles",tj->keepfiles,&flg,&set);CHKERRQ(ierr);
   if (set) {ierr = TSTrajectorySetKeepFiles(tj,flg);CHKERRQ(ierr);}
 
-  ierr = PetscOptionsString("-ts_trajectory_dirname","Directory name for TSTrajectory file","TSTrajectorySetDirname",0,dirname,PETSC_MAX_PATH_LEN-14,&set);CHKERRQ(ierr);
+  ierr = PetscOptionsString("-ts_trajectory_dirname","Directory name for TSTrajectory file","TSTrajectorySetDirname",NULL,dirname,PETSC_MAX_PATH_LEN-14,&set);CHKERRQ(ierr);
   if (set) {
     ierr = TSTrajectorySetDirname(tj,dirname);CHKERRQ(ierr);
   }
 
-  ierr = PetscOptionsString("-ts_trajectory_file_template","Template for TSTrajectory file name, use filename-%06D.bin","TSTrajectorySetFiletemplate",0,filetemplate,PETSC_MAX_PATH_LEN,&set);CHKERRQ(ierr);
+  ierr = PetscOptionsString("-ts_trajectory_file_template","Template for TSTrajectory file name, use filename-%06D.bin","TSTrajectorySetFiletemplate",NULL,filetemplate,PETSC_MAX_PATH_LEN,&set);CHKERRQ(ierr);
   if (set) {
     ierr = TSTrajectorySetFiletemplate(tj,filetemplate);CHKERRQ(ierr);
   }

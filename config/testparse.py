@@ -4,7 +4,7 @@ Parse the test file and return a dictionary.
 
 Quick usage::
 
-  lib/petsc/bin/maint/testparse.py -t src/ksp/ksp/examples/tutorials/ex1.c
+  lib/petsc/bin/maint/testparse.py -t src/ksp/ksp/tutorials/ex1.c
 
 From the command line, it prints out the dictionary.  
 This is meant to be used by other scripts, but it is 
@@ -309,9 +309,9 @@ def genTestsSubtestSuffix(testnames,sdicts):
 
 def splitTests(testname,sdict):
   """
-  Given: testname and YAML-generated dictionary
+  Given: testname and dictionary generated from the YAML-like definition
   Return: list of names and dictionaries corresponding to each test
-          given that the YAML language allows for multiple tests
+          given that the YAML-like language allows for multiple tests
   """
 
   # Order: Parent sep_tv, subtests suffix, subtests sep_tv
@@ -323,10 +323,55 @@ def splitTests(testname,sdict):
 
   return testnames, sdicts
 
+
+def testSplit(striptest):
+  """
+  Split up a test into lines, but use a shell parser to detect when newlines are within quotation marks
+  and keep those together
+  """
+  import shlex
+
+  sl = shlex.shlex()
+  sl.whitespace_split = True # only split at whitespace
+  sl.commenters = ''
+  sl.push_source(striptest)
+  last_pos = sl.instream.tell()
+  try:
+    last_token = sl.read_token()
+  except ValueError:
+    print(striptest)
+    raise ValueError
+  last_line = ''
+  while last_token != '':
+    new_pos = sl.instream.tell()
+    block = striptest[last_pos:new_pos]
+    token_start = block.find(last_token)
+    leading = block[0:token_start]
+    trailing = block[(token_start + len(last_token)):]
+    leading_split = leading.split('\n')
+    if len(leading_split) > 1:
+      yield last_line
+      last_line = ''
+    last_line += leading_split[-1]
+    last_line += last_token
+    trailing_split = trailing.split('\n')
+    last_line += trailing_split[0]
+    if len(trailing_split) > 1:
+      yield last_line
+      last_line = ''
+    last_pos = new_pos
+    try:
+      last_token = sl.read_token()
+    except ValueError:
+      print(striptest)
+      raise ValueError
+  yield last_line
+
+
 def parseTest(testStr,srcfile,verbosity):
   """
   This parses an individual test
-  YAML is hierarchial so should use a state machine in the general case,
+  Our YAML-like language is hierarchial so should use a state machine in the general case,
   but in practice we only support two levels of test:
   """
   basename=os.path.basename(srcfile)
@@ -345,7 +390,7 @@ def parseTest(testStr,srcfile,verbosity):
   subdict={}
   comments=[]
   indentlevel=0
-  for ln in striptest.split("\n"):
+  for ln in testSplit(striptest):
     line=ln.split('#')[0].rstrip()
     if verbosity>2: print(line)
     comment=("" if len(ln.split("#"))>0 else " ".join(ln.split("#")[1:]).strip())
@@ -394,13 +439,9 @@ def parseTest(testStr,srcfile,verbosity):
 
 def parseTests(testStr,srcfile,fileNums,verbosity):
   """
-  Parse the yaml string describing tests and return 
+  Parse the YAML-like string describing tests and return
   a dictionary with the info in the form of:
     testDict[test][subtest]
-  This is an inelegant parser as we do not wish to 
-  introduce a new dependency by bringing in pyyaml.
-  The advantage is that validation can be done as 
-  it is parsed (e.g., 'test' is the only top-level node)
   """
 
   testDict={}
@@ -509,6 +550,9 @@ def printExParseDict(rDict):
     sortkeys=list(rDict[sfile].keys())
     sortkeys.sort()
     for runex in sortkeys:
+      if runex == 'requires':
+        print(indent+runex+':'+str(rDict[sfile][runex]))
+        continue
       print(indent+runex)
       if type(rDict[sfile][runex])==bytes:
         print(indent*2+rDict[sfile][runex])
