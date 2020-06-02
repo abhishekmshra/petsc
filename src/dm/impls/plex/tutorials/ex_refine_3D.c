@@ -306,6 +306,7 @@ int main(int argc, char **argv)
 
   /* DM View */
   ierr = DMViewFromOptions(dm, NULL, "-dm_view");CHKERRQ(ierr);
+  ierr = DMSetFromOptions(dm);CHKERRQ(ierr);
 
   /* Petsc Viewer */
   Vec            u;
