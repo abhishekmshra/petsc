@@ -6,6 +6,7 @@ static char help[] = "Adaptively refine mesh using mutiple external refinement f
 #include <petscdmlabel.h>
 #include <petscds.h>
 #include <petscmath.h>
+#include <petscviewerhdf5.h>
 
 typedef struct {
   PetscReal      p, xcenter, ycenter, zcenter;
@@ -314,10 +315,12 @@ int main(int argc, char **argv)
 
   ierr = DMGetGlobalVector(dm, &u);CHKERRQ(ierr);
   ierr = PetscViewerCreate(PETSC_COMM_WORLD, &viewer);CHKERRQ(ierr);
-  ierr = PetscViewerSetType(viewer, PETSCVIEWERVTK);CHKERRQ(ierr);
-  ierr = PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_VTK);CHKERRQ(ierr);
-  ierr = PetscViewerFileSetName(viewer, "sol.vtk");CHKERRQ(ierr);
+  ierr = PetscViewerSetType(viewer, PETSCVIEWERHDF5);CHKERRQ(ierr);
+  //ierr = PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_INFO_DETAIL);CHKERRQ(ierr);
+  ierr = PetscViewerFileSetMode(viewer, FILE_MODE_WRITE);CHKERRQ(ierr);
+  ierr = PetscViewerFileSetName(viewer, "mesh.h5");CHKERRQ(ierr);
   ierr = VecView(u, viewer);CHKERRQ(ierr);
+  ierr = DMView(dm, viewer);CHKERRQ(ierr);
   ierr = PetscViewerDestroy(&viewer);CHKERRQ(ierr);
   ierr = DMRestoreGlobalVector(dm, &u);CHKERRQ(ierr);
 
